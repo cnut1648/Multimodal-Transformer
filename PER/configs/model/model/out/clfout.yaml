@@ -1,0 +1,5 @@
+_target_: src.models.components.out.ClfOut
+
+dim: ${..backbone.dim}
+dropout: ${..backbone.ff_dropout}
+num_classes: ${datamodule.num_classes}

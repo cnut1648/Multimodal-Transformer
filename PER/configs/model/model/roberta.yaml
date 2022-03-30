@@ -1,0 +1,5 @@
+_target_: src.models.components.TextModel.PlainTransformer
+
+arch_name: roberta-large
+num_classes: ${model.num_classes}
+freeze_strategy: no-freeze

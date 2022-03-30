@@ -1,0 +1,7 @@
+# @package _global_
+
+defaults:
+  - override /model: video
+  - override /model/scheduler: stepLR
+  - override /model/optim: adam
+  - override /model/model: meta_timesformer

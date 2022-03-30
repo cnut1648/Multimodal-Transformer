@@ -1,0 +1,25 @@
+_target_: src.models.bi_module.BiModule
+
+model1:
+  model: ???
+  optim: ???
+  scheduler: ???
+  weight: ???
+
+model2:
+  model: ???
+  optim: ???
+  scheduler: null
+  weight: ???
+
+aligner_optim: ???
+link_mode: ???
+exchange_levels: ???
+
+modality: ???
+task: ${datamodule.task}
+init: null
+num_classes: ${datamodule.num_classes}
+stage: singlestage
+dataset: ${datamodule.dataset}
+accumulate_grad_batches: 1

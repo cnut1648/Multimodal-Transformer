@@ -1,0 +1,12 @@
+_target_: src.models.video_module.VideoModule
+defaults:
+  - model: ???
+  - optim: ???
+  - scheduler: null
+
+modality: video
+task: ${datamodule.task}
+dataset: ${datamodule.dataset}
+init: null
+num_classes: ${datamodule.num_classes}
+ordinal_regression: null

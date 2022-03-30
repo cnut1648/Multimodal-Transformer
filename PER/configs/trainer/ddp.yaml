@@ -1,0 +1,8 @@
+defaults:
+  - default.yaml
+
+# better not use fp16 if audio no smarter sampler
+precision: 32
+strategy: ddp
+sync_batchnorm: True
+replace_sampler_ddp: True

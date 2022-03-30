@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - /model/model/meta_timesformer@model.video_model.model
+  - /model/optim/adam@model.video_model.optim
+  - /model/scheduler/stepLR@model.video_model.scheduler
+
+  - /model/model/plain_transformer@model.text_model.model
+  - /model/optim/adamw@model.text_model.optim
+  - model.text_model.scheduler: null
+  - override /model: multistage_vt
+
+model:
+  link_mode: TCP

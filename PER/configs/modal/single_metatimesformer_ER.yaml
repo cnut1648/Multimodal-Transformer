@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - /model/model/meta_timesformer@model.model1.model
+  - /model/optim/adam@model.model1.optim
+  - /model/scheduler/stepLR@model.model1.scheduler
+
+  - /model/model/plain_transformer@model.model2.model
+  - /model/optim/adamw@model.model2.optim
+  - model.model2.scheduler: null
+  - /model/optim/adam@model.aligner_optim
+  - override /model: bi
+
+model:
+  link_mode: sync
+  modality: vt
+  exchange_levels:
+    # # 1 <-> 2
+    # - [1, [temporal_fc, output.dense], [norm2, output.LayerNorm], [True, True]]
+    # - [-1, [temporal_fc, output.dense], [norm2, output.LayerNorm], [True, True]]
+    # only 1->2
+    # - [1, [temporal_fc, output.dense], [norm2, output.LayerNorm], [True, False]]
+    # - [-1, [temporal_fc, output.dense], [norm2, output.LayerNorm], [True, False]]
+    # only 1->2, layernorm
+    - [1, [norm2, output.LayerNorm], [norm2, output.LayerNorm], [True, False]]
+    - [-1, [norm2, output.LayerNorm], [norm2, output.LayerNorm], [True, False]]

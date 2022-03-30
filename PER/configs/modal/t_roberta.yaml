@@ -1,0 +1,8 @@
+# @package _global_
+
+
+defaults:
+  - override /model: text
+  - override /model/scheduler: null
+  - override /model/optim: adamw
+  - override /model/model: roberta

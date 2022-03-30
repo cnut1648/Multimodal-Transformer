@@ -1,0 +1,209 @@
+from typing import Optional
+import torch
+import numpy as np
+from torchmetrics import (
+    MeanAbsoluteError, MetricCollection, Metric,
+    Accuracy, Precision, Recall, F1Score, ClasswiseWrapper,
+    MeanMetric
+)
+from sklearn.metrics import accuracy_score, f1_score
+
+
+class CCC(Metric):
+    """
+    ConcordanceCorrelationCoefficient
+    """
+    def __init__(self, index: int, compute_on_step=True, dist_sync_on_step=False):
+        super().__init__(compute_on_step=compute_on_step, dist_sync_on_step=dist_sync_on_step)
+        self.add_state("true", default=[], dist_reduce_fx="cat")
+        self.add_state("pred", default=[], dist_reduce_fx="cat")
+        self.index = index
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        """
+        both (bsz, 2), only get the `index` one
+        """
+        assert preds.shape == target.shape
+        assert preds.ndim == 2
+        self.true.append(target[:, self.index].detach())
+        self.pred.append(preds[:, self.index].detach())
+    
+    def compute(self):
+        """
+        Returns
+        loss : A float in the range [-1,1]. A value of 1 indicates perfect agreement
+        between the true and the predicted values.
+        """
+        if self.true[0].ndim != 0:
+            y_true, y_pred = torch.cat(self.true), torch.cat(self.pred)
+        else:
+            y_true, y_pred = self.true, self.pred
+        # both (bsz, )
+        y_true, y_pred = y_true.cpu().numpy(), y_pred.cpu().numpy()
+        cor=np.corrcoef(y_true,y_pred)[0][1]
+
+        mean_true=np.mean(y_true)
+        mean_pred=np.mean(y_pred)
+
+        var_true=np.var(y_true)
+        var_pred=np.var(y_pred)
+
+        sd_true=np.std(y_true)
+        sd_pred=np.std(y_pred)
+
+        numerator=2*cor*sd_true*sd_pred
+        denominator=var_true+var_pred+(mean_true-mean_pred)**2
+        return numerator/denominator
+
+class Corr(Metric):
+    def __init__(self, compute_on_step=True, dist_sync_on_step=False):
+        super().__init__(compute_on_step=compute_on_step, dist_sync_on_step=dist_sync_on_step)
+        self.add_state("true", default=[], dist_reduce_fx="cat")
+        self.add_state("pred", default=[], dist_reduce_fx="cat")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        """
+        both (bsz, )
+        """
+        assert preds.shape == target.shape
+        assert preds.ndim == 1
+        self.true.append(target.detach())
+        self.pred.append(preds.detach())
+
+    def compute(self):
+        if self.true[0].ndim != 0:
+            y_true, y_pred = torch.cat(self.true), torch.cat(self.pred)
+        else:
+            y_true, y_pred = self.true, self.pred
+        # from [0, 6] to [-3, 3]
+        y_true, y_pred = y_true.cpu().numpy(), y_pred.cpu().numpy()
+        return np.corrcoef(y_pred, y_true)[0][1]
+
+class Acc2(Metric):
+    def __init__(self, compute_on_step=True, dist_sync_on_step=False):
+        super().__init__(compute_on_step=compute_on_step, dist_sync_on_step=dist_sync_on_step)
+        self.add_state("true", default=[], dist_reduce_fx="cat")
+        self.add_state("pred", default=[], dist_reduce_fx="cat")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        assert preds.shape == target.shape
+        assert preds.ndim == 1
+        self.true.append(target.detach())
+        self.pred.append(preds.detach())
+
+    def compute(self):
+        if self.true[0].ndim != 0:
+            y_true, y_pred = torch.cat(self.true), torch.cat(self.pred)
+        else:
+            y_true, y_pred = self.true, self.pred
+        # from [0, 6] to [-3, 3]
+        y_true, y_pred = y_true.cpu().numpy()-3, y_pred.cpu().numpy()-3
+        
+        mask = (y_true != 0)
+        y_true = y_true[mask]
+        y_pred = y_pred[mask]
+        y_true = np.where(y_true > 0, 1, 0)
+        y_pred = np.where(y_pred > 0, 1, 0)
+        return accuracy_score(y_true, y_pred)
+
+class F12(Metric):
+    def __init__(self, compute_on_step=True, dist_sync_on_step=False):
+        super().__init__(compute_on_step=compute_on_step, dist_sync_on_step=dist_sync_on_step)
+        self.add_state("true", default=[], dist_reduce_fx="cat")
+        self.add_state("pred", default=[], dist_reduce_fx="cat")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor):
+        assert preds.shape == target.shape, f'{preds.shape} != {target.shape}'
+        assert preds.ndim == 1
+        self.true.append(target.detach())
+        self.pred.append(preds.detach())
+
+    def compute(self):
+        if self.true[0].ndim != 0:
+            y_true, y_pred = torch.cat(self.true), torch.cat(self.pred)
+        else:
+            y_true, y_pred = self.true, self.pred
+        # from [0, 6] to [-3, 3]
+        y_true, y_pred = y_true.cpu().numpy()-3, y_pred.cpu().numpy()-3
+
+        mask = (y_true != 0)
+        y_true = y_true[mask]
+        y_pred = y_pred[mask]
+        y_true = np.where(y_true > 0, 1, 0)
+        y_pred = np.where(y_pred > 0, 1, 0)
+        return f1_score(y_true, y_pred, average="weighted")
+
+class ModuleMetricMixin:
+    def __init__(
+        self, task: str, num_classes: int,
+        dataset: str,
+        ordinal_regression: Optional[str] = None,
+        **kwargs
+    ):
+        assert task in ["clf", "reg"]
+        assert dataset in ["msp_improv", "cmu_mosei", "iemocap"]
+        super().__init__()
+        # use separate metric instance for train, val and test step
+        # to ensure a proper reduction over the epoch
+
+        # loss function and metric
+        if task == "reg":
+            assert ordinal_regression is None
+            assert num_classes == 2
+            assert dataset == "msp_improv"
+            train_metrics = MetricCollection({
+                "valence_CCC": CCC(index=0, compute_on_step=False),
+                "arousal_CCC": CCC(index=1, compute_on_step=False),
+            }, prefix="train/")
+        else:
+            additional_metrics = {}
+            if dataset == "msp_improv": 
+                assert ordinal_regression is None
+                assert num_classes == 4
+                labels = ["neutral", "angry", "sad", "happy"]
+            elif dataset == "cmu_mosei":
+                if num_classes == 7:
+                    assert ordinal_regression in [None, "None", "coral", "corn"], f"ordinal regression is {ordinal_regression}, type={type(ordinal_regression)}"
+                elif num_classes == 1:
+                    assert ordinal_regression is None
+                    # temporary change to 7 so that classwise wrapper works
+                    num_classes = 7
+                else:
+                    raise NotImplementedError
+                labels = list(map(str, range(-3, 4)))
+                additional_metrics = {
+                    **additional_metrics,
+                    "Acc2": Acc2(compute_on_step=False),
+                    "WF12": F12(compute_on_step=False),
+                    "Corr": Corr(compute_on_step=False),
+                    "MAE": MeanAbsoluteError(),
+                }
+            # iemocap
+            else:
+                assert ordinal_regression is None
+                assert num_classes == 4
+                labels = ["neu", "hap", "ang", "sad"]
+
+            train_metrics = MetricCollection({
+                # weighted acc, reported in MOSEI
+                "WA": Accuracy(num_classes=num_classes, threshold=0.5, average="weighted"),
+                # unweight acc, reported in MSP
+                "UA": Accuracy(num_classes=num_classes, threshold=0.5, average="micro"),
+                "Precision": Precision(num_classes=num_classes, threshold=0.5, average="weighted"),
+                "Recall": Recall(num_classes=num_classes, threshold=0.5, average="weighted"),
+                # weighted F1
+                "WF1": F1Score(num_classes=num_classes, threshold=0.5, average="weighted"),
+                "classwise_acc": ClasswiseWrapper(Accuracy(num_classes=num_classes, average=None), labels),
+                "classwise_f1": ClasswiseWrapper(F1Score(num_classes=num_classes, average=None), labels),
+                **additional_metrics
+            }, prefix="train/")
+
+        self.metrics = torch.nn.ModuleDict({
+            "train_metrics": train_metrics,
+            "valid_metrics": train_metrics.clone(prefix="valid/"),
+            "test_metrics": train_metrics.clone(prefix="test/")
+        })
+        self.mean_losses = torch.nn.ModuleDict({
+            "train_losses": MeanMetric(),
+            "valid_losses": MeanMetric(),
+        })

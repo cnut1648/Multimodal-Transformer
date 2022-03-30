@@ -1,0 +1,5 @@
+_target_: src.models.components.AudioModel.HuBERT
+
+num_classes: ${model.num_classes} 
+sample_rate: 16000
+pretrain_path: facebook/hubert-large-ll60k

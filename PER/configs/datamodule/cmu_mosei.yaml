@@ -1,0 +1,20 @@
+_target_: src.datamodules.cmu_mosei_datamodule.CMU_MOSEI_DataModule
+
+task: clf
+fold: 1
+modality: ${model.modality}
+dataset: cmu_mosei
+# or 7
+num_classes: 2
+# dataset
+data_dir: ${data_dir}/CMU-MOSEI/all_data
+csv_dir: ${.data_dir}
+
+# dataloader
+batch_size: 32
+num_workers: 1
+pin_memory: True
+
+# only for video
+num_frames: 16
+image_size: 112

@@ -1,0 +1,30 @@
+_target_: src.models.multistage_VT_module.VTModule
+
+video_model:
+  model: ???
+  optim: ???
+  scheduler: ???
+
+text_model:
+  model: ???
+  optim: ???
+  scheduler: null
+
+link_mode: ???
+# defaults:
+#   - model/plain_video@video_model.model
+#   - optim/adam@video_model.optim
+#   - scheduler/stepLR@video_model.scheduler
+
+#   - model/plain_transformer@text_model.model
+#   - optim/adamw@text_model.optim
+#   - text_model.scheduler: null
+
+#   - override model/out@video_model.model.out: clfout
+#   - override model/backbone@video_model.model.backbone: timesformer
+
+modality: vt
+task: ${datamodule.task}
+init: null
+num_classes: ${datamodule.num_classes}
+stage: multistage

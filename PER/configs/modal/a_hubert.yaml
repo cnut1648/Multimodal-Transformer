@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - override /model: audio
+  - override /model/scheduler: null
+  - override /model/optim: adamw
+  - override /model/model: hubert
+
+datamodule:
+  spec_aug: True
+  # max_audio_len: 500000
+  # max_audio_len: 300000
+  max_audio_len: 300000
+  audio_format: raw
+  cache_dir: ${data_dir}/cache/raw
+  use_smart_sampler: False

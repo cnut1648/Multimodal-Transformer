@@ -1,0 +1,12 @@
+_target_: src.models.audio_module.AudioModule
+defaults:
+  - model: ???
+  - optim: ???
+  - scheduler: null
+
+modality: audio
+task: ${datamodule.task}
+dataset: ${datamodule.dataset}
+init: null
+num_classes: ${datamodule.num_classes}
+ordinal_regression: null

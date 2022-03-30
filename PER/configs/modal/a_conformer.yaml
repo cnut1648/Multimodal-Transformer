@@ -1,0 +1,13 @@
+# @package _global_
+
+defaults:
+  - override /model: audio
+  - override /model/scheduler: stepLR
+  - override /model/optim: adam
+  - override /model/model: conformer
+
+datamodule:
+  spec_aug: True
+  max_audio_len: 4000
+  audio_format: fbank
+  cache_dir: ${data_dir}/cache/fbank

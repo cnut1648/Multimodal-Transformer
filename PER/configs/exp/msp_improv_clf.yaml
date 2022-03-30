@@ -1,0 +1,19 @@
+# @package _global_
+
+# to execute this experiment run:
+# python run.py exp=<name>
+
+defaults:
+  - override /datamodule: msp_improv.yaml
+
+datamodule:
+  task: clf
+  num_classes: 4
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+# name of the run determines folder name in logs
+# can also be accessed by loggers
+name: MSP-IMPROV
+
+seed: 12345

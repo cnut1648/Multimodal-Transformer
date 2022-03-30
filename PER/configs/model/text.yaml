@@ -1,0 +1,12 @@
+_target_: src.models.text_module.TextModule
+defaults:
+  - model: ???
+  - optim: ???
+  - scheduler: null
+
+modality: text
+task: ${datamodule.task}
+dataset: ${datamodule.dataset}
+init: null
+num_classes: ${datamodule.num_classes}
+ordinal_regression: null
