@@ -1,9 +1,0 @@
-# @package _global_
-
-defaults:
-  - override /model: video
-  - override /model/scheduler: stepLR
-  - override /model/optim: adam
-  - override /model/model/backbone: timesformer
-  - override /model/model/out: clfout
-  - override /model/model: plain_video

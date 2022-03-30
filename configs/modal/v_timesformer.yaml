@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - override /model: video
+  - override /model/scheduler: stepLR
+  - override /model/optim: adam
+  - override /model/model: timesformer
+
+datamodule:
+  num_frames: 8
+  image_size: 112
+
+model:
+  model:
+    pretrained_model: /shares/perception/yufeng/project/personalized_emotion_recognition/myTimesFormer/checkpoints/Aff-Wild2.pyth
+    # pretrained_model: ''

@@ -1,4 +1,0 @@
-_target_: src.models.components.model.ER_Model
-defaults:
-  - backbone: ???
-  - out: ???

@@ -1,0 +1,20 @@
+# https://wandb.ai
+
+wandb:
+  _target_: pytorch_lightning.loggers.wandb.WandbLogger
+  project: "M2022-${name}-${datamodule.modality}-${datamodule.task}"
+  # name: 
+  save_dir: "."
+  offline: False # set True to store all logs only locally
+  # id: null # pass correct id to resume experiment!
+  entity: "usc_ihp"  # set to name of your wandb team
+  # set to True to upload checkpoint
+  log_model: False
+  # prefix: ""
+  # job_type: "train"
+  group: null
+  tags:
+    - ${datamodule.task}
+    - ${name}
+    - "fold-${datamodule.fold}"
+    - K=${datamodule.num_classes}
