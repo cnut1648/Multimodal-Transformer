@@ -99,7 +99,7 @@ class MultiDataset(Dataset):
     def get_raw_audio(self, utterance, max_audio_len):
         session, gender, dialog, utteranceid = get_meta(utterance)
         audio_path = os.path.join(
-            data_root, "audio", f"Session{session}",
+            self.data_root, "audio", f"Session{session}",
             f"Ses0{session}{gender}_{dialog}", f"{utterance}.wav")
         signal, sample_rate = librosa.load(audio_path, sr=None, mono=True)
         if len(signal) > max_audio_len:

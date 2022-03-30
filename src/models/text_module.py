@@ -6,8 +6,6 @@ from omegaconf import DictConfig
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 
 from .base_model import BaseModule
-from sklearn.metrics import *
-from torchmetrics import F1Score, Recall
 
 
 class TextModule(BaseModule):
@@ -29,7 +27,7 @@ class TextModule(BaseModule):
         batch, labels = super().preprocess_batch(batch)
         text: List[str] = batch.pop("text")
         tokens = self.model.tokenize(text).to(self.device)
-        return tokens, labels
+        return {**batch, **tokens}, labels
 
     def configure_optimizers(self):
         wd = self.hparams.optim.pop("weight_decay")

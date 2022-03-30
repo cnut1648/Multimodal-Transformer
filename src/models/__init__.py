@@ -8,6 +8,49 @@ from torchmetrics import (
 )
 from sklearn.metrics import accuracy_score, f1_score
 
+class MOSEIMetric(Metric):
+    """
+    compute 2-class metric for CMU-MOSEI
+    only compute over instances where [label2 != None, label7 != 0]
+    """
+    def __init__(self, compute_on_step=True, dist_sync_on_step=False):
+        super().__init__(compute_on_step=compute_on_step, dist_sync_on_step=dist_sync_on_step)
+        self.add_state("true7", default=[], dist_reduce_fx="cat")
+        self.add_state("true2", default=[], dist_reduce_fx="cat")
+        self.add_state("pred", default=[], dist_reduce_fx="cat")
+
+    def update(self, preds: torch.Tensor, target7: torch.Tensor, target2: torch.Tensor):
+        """
+        all (bsz, )
+        """
+        assert preds.shape == target7.shape == target2.shape
+        assert preds.ndim == 1
+        self.true7.append(target7.detach())
+        self.true2.append(target2.detach())
+        self.pred.append(preds.detach())
+
+    def compute(self):
+        if self.true7[0].ndim != 0:
+            y_true2, y_true7, y_pred = torch.cat(self.true2), torch.cat(self.true7), torch.cat(self.pred)
+        else:
+            y_true2, y_true7, y_pred = self.true2, self.true7, self.pred
+        # from [0, 6] to [-3, 3]
+        y_true7, y_pred = y_true7.cpu().numpy() - 3, y_pred.cpu().numpy() - 3
+        y_true2 = y_true2.cpu().numpy()
+
+        corr = np.corrcoef(y_pred, y_true7)[0][1]
+
+        # if label2 is None, map to -1
+        exclude = (y_true2 == -1) & (y_true7 == 0)
+        y_true7, y_pred = y_true7[~exclude], y_pred[~exclude]
+        y_true7 = np.where(y_true7 > 0, 1, 0)
+        y_pred = np.where(y_pred > 0, 1, 0)
+
+        return {
+            "corr": corr,
+            "acc2": accuracy_score(y_true7, y_pred),
+            "f12":  f1_score(y_true7, y_pred, average="weighted")
+        }
 
 class CCC(Metric):
     """
@@ -55,83 +98,6 @@ class CCC(Metric):
         denominator=var_true+var_pred+(mean_true-mean_pred)**2
         return numerator/denominator
 
-class Corr(Metric):
-    def __init__(self, compute_on_step=True, dist_sync_on_step=False):
-        super().__init__(compute_on_step=compute_on_step, dist_sync_on_step=dist_sync_on_step)
-        self.add_state("true", default=[], dist_reduce_fx="cat")
-        self.add_state("pred", default=[], dist_reduce_fx="cat")
-
-    def update(self, preds: torch.Tensor, target: torch.Tensor):
-        """
-        both (bsz, )
-        """
-        assert preds.shape == target.shape
-        assert preds.ndim == 1
-        self.true.append(target.detach())
-        self.pred.append(preds.detach())
-
-    def compute(self):
-        if self.true[0].ndim != 0:
-            y_true, y_pred = torch.cat(self.true), torch.cat(self.pred)
-        else:
-            y_true, y_pred = self.true, self.pred
-        # from [0, 6] to [-3, 3]
-        y_true, y_pred = y_true.cpu().numpy(), y_pred.cpu().numpy()
-        return np.corrcoef(y_pred, y_true)[0][1]
-
-class Acc2(Metric):
-    def __init__(self, compute_on_step=True, dist_sync_on_step=False):
-        super().__init__(compute_on_step=compute_on_step, dist_sync_on_step=dist_sync_on_step)
-        self.add_state("true", default=[], dist_reduce_fx="cat")
-        self.add_state("pred", default=[], dist_reduce_fx="cat")
-
-    def update(self, preds: torch.Tensor, target: torch.Tensor):
-        assert preds.shape == target.shape
-        assert preds.ndim == 1
-        self.true.append(target.detach())
-        self.pred.append(preds.detach())
-
-    def compute(self):
-        if self.true[0].ndim != 0:
-            y_true, y_pred = torch.cat(self.true), torch.cat(self.pred)
-        else:
-            y_true, y_pred = self.true, self.pred
-        # from [0, 6] to [-3, 3]
-        y_true, y_pred = y_true.cpu().numpy()-3, y_pred.cpu().numpy()-3
-        
-        mask = (y_true != 0)
-        y_true = y_true[mask]
-        y_pred = y_pred[mask]
-        y_true = np.where(y_true > 0, 1, 0)
-        y_pred = np.where(y_pred > 0, 1, 0)
-        return accuracy_score(y_true, y_pred)
-
-class F12(Metric):
-    def __init__(self, compute_on_step=True, dist_sync_on_step=False):
-        super().__init__(compute_on_step=compute_on_step, dist_sync_on_step=dist_sync_on_step)
-        self.add_state("true", default=[], dist_reduce_fx="cat")
-        self.add_state("pred", default=[], dist_reduce_fx="cat")
-
-    def update(self, preds: torch.Tensor, target: torch.Tensor):
-        assert preds.shape == target.shape, f'{preds.shape} != {target.shape}'
-        assert preds.ndim == 1
-        self.true.append(target.detach())
-        self.pred.append(preds.detach())
-
-    def compute(self):
-        if self.true[0].ndim != 0:
-            y_true, y_pred = torch.cat(self.true), torch.cat(self.pred)
-        else:
-            y_true, y_pred = self.true, self.pred
-        # from [0, 6] to [-3, 3]
-        y_true, y_pred = y_true.cpu().numpy()-3, y_pred.cpu().numpy()-3
-
-        mask = (y_true != 0)
-        y_true = y_true[mask]
-        y_pred = y_pred[mask]
-        y_true = np.where(y_true > 0, 1, 0)
-        y_pred = np.where(y_pred > 0, 1, 0)
-        return f1_score(y_true, y_pred, average="weighted")
 
 class ModuleMetricMixin:
     def __init__(
@@ -147,6 +113,7 @@ class ModuleMetricMixin:
         # to ensure a proper reduction over the epoch
 
         # loss function and metric
+        dataset_specific_metrics = None
         if task == "reg":
             assert ordinal_regression is None
             assert num_classes == 2
@@ -165,6 +132,7 @@ class ModuleMetricMixin:
                 if num_classes == 7:
                     assert ordinal_regression in [None, "None", "coral", "corn"], f"ordinal regression is {ordinal_regression}, type={type(ordinal_regression)}"
                 elif num_classes == 1:
+                    # L1 loss
                     assert ordinal_regression is None
                     # temporary change to 7 so that classwise wrapper works
                     num_classes = 7
@@ -173,16 +141,15 @@ class ModuleMetricMixin:
                 labels = list(map(str, range(-3, 4)))
                 additional_metrics = {
                     **additional_metrics,
-                    "Acc2": Acc2(compute_on_step=False),
-                    "WF12": F12(compute_on_step=False),
-                    "Corr": Corr(compute_on_step=False),
                     "MAE": MeanAbsoluteError(),
                 }
+                dataset_specific_metrics = ("mosei", MOSEIMetric(compute_on_step=False))
+                
             # iemocap
             else:
                 assert ordinal_regression is None
                 assert num_classes == 4
-                labels = ["neu", "hap", "ang", "sad"]
+                labels = ["neu", "sad", "ang", "hap"]
 
             train_metrics = MetricCollection({
                 # weighted acc, reported in MOSEI
@@ -203,6 +170,14 @@ class ModuleMetricMixin:
             "valid_metrics": train_metrics.clone(prefix="valid/"),
             "test_metrics": train_metrics.clone(prefix="test/")
         })
+        if dataset_specific_metrics is not None:
+            metricname, metric = dataset_specific_metrics
+            self.metrics.update({
+                f"train_{metricname}": metric,
+                f"valid_{metricname}": metric.clone(),
+                f"test_{metricname}": metric.clone(),
+            })
+
         self.mean_losses = torch.nn.ModuleDict({
             "train_losses": MeanMetric(),
             "valid_losses": MeanMetric(),

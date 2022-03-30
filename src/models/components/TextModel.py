@@ -48,17 +48,17 @@ class PlainTransformer(TextModel):
           in `bimodule` can customize this forward
           NOTE: due to dropout, forward twice can get different output
         """
-        if not self.training:
-            output = self.model(input_ids, attention_mask=attention_mask)
-            return output.logits
-        block_input, extendend_attention_mask = \
-            self.before_layers(input_ids, attention_mask)
-        for block in self.blocks:
-            layer_outputs = self.block(block,
-                block_input, extendend_attention_mask)
-            block_input = layer_outputs[0]
-        logits = self.after_layers(block_input)
-        return logits
+        # if not self.training:
+        output = self.model(input_ids, attention_mask=attention_mask)
+        return output.logits
+        # block_input, extendend_attention_mask = \
+        #     self.before_layers(input_ids, attention_mask)
+        # for block in self.blocks:
+        #     layer_outputs = self.block(block,
+        #         block_input, extendend_attention_mask)
+        #     block_input = layer_outputs[0]
+        # logits = self.after_layers(block_input)
+        # return logits
     
     def before_layers(self, input_ids, attention_mask):
         """

@@ -22,7 +22,7 @@ if [[ $ds == "iemocap" ]]; then
     # folds=2,3,4,5
 elif [[ $ds == "mosei" ]]; then
     echo "mosei";
-    bsz=2;
+    bsz=16;
     exp=cmu_mosei_l1;
     folds=1
 else

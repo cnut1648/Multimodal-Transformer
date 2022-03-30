@@ -84,7 +84,6 @@ class BaseModule(ModuleMetricMixin, LightningModule):
             preds = torch.argmax(logits, dim=1)
         return loss, preds
 
-    
     def compute_step(self, batch: Any, split: str):
         """
         compute one step and one backward
@@ -93,7 +92,11 @@ class BaseModule(ModuleMetricMixin, LightningModule):
         logits = self.forward(batch)
         loss, preds = self.postprocess_logits(logits, labels)
         self.log(f"{split}/step/loss", loss, on_step=True, on_epoch=False, prog_bar=False, sync_dist=True)
-        return {"loss": loss, "preds": preds, "targets": labels}
+        ret = {"loss": loss, "preds": preds, "targets": labels}
+        if self.hparams.dataset == "cmu_mosei":
+            assert "labels2" in batch
+            ret.update({"labels2": batch['labels2']})
+        return ret
        
     def compute_step_end(self, outputs, split: str):
         """
@@ -104,14 +107,16 @@ class BaseModule(ModuleMetricMixin, LightningModule):
         if split != "test":
             self.mean_losses[f"{split}_losses"](losses)
         self.metrics[f"{split}_metrics"](preds, labels)
+        if self.hparams.dataset == "cmu_mosei":
+            self.metrics[f"{split}_mosei"](preds, labels, outputs["labels2"])
 
     def agg_epoch(self, outputs: List[Any], split: str):
         # t = torch.cat([o["targets"] for o in outputs]).cpu().numpy()
         # p = torch.cat([o["preds"] for o in outputs]).cpu().numpy()
         if split != "test":
             loss = self.mean_losses[f"{split}_losses"].compute()
-            self.log(f"{split}/epoch/loss", loss, on_epoch=True, prog_bar=True)
             self.mean_losses[f"{split}_losses"].reset()
+            self.log(f"{split}/epoch/loss", loss, on_epoch=True, prog_bar=True)
         
         metrics = self.metrics[f"{split}_metrics"].compute()
         # make classwise e.g. valid/accuracy_neu separate namespace
@@ -120,8 +125,15 @@ class BaseModule(ModuleMetricMixin, LightningModule):
                 value = metrics.pop(k)
                 splitname, k = k.split("/")
                 metrics[f"{splitname}/classwise/{k}"] = value
-        self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         self.metrics[f"{split}_metrics"].reset()
+        if self.hparams.dataset == "cmu_mosei":
+            # eg {'corr': nan, 'acc2': 0.46153846153846156, 'f12': 0.291497975708502}
+            mosei_metric = self.metrics[f"{split}_mosei"].compute()
+            for name, value in mosei_metric.items():
+                metrics[f"{split}/{name}"] = value
+            self.metrics[f"{split}_mosei"].reset()
+
+        self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
     
     def setup(self, stage: Optional[str] = None) -> None:
         train_loader = self.trainer.datamodule.train_dataloader()

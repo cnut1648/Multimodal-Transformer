@@ -1,29 +1,49 @@
 import random
-from typing import List, Optional, Tuple
-import os, pickle
+from typing import Optional, Tuple
+import os
 import numpy as np
-from pathlib import Path
-from hydra.utils import get_original_cwd
-from torch.utils.data.sampler import RandomSampler, SequentialSampler, BatchSampler, Sampler
-import librosa
 
-import torch
+import torch, librosa
 import pandas as pd
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.datasets import MNIST
+from torch.utils.data.sampler import RandomSampler, SequentialSampler, BatchSampler, Sampler
 from torchvision.transforms import transforms
 from ..utils.io import sample_frames, load_img
 from torch.utils.data.dataloader import default_collate
 
-class CMU_MOSEI_Dataset(Dataset):
+class MultiDataset(Dataset):
+    def __init__(self, task: str, csv_path, data_root, split, **kwargs):
+        self.task = task
+        self.dataset = pd.read_csv(os.path.join(csv_path, f"post_{split}.csv"), sep='\t', quoting=3, engine="python")
+        self.dataset.reset_index(inplace=True)
+        self.data_root = data_root
+        self.split = split
+
+    def __getitem__(self, index):
+        label = int(self.dataset['label_7'][index])
+        # shift [-3, -2, -1, 0, 1, 2, 3] to [0, 1, 2, 3, 4, 5, 6]
+        label = int(label) + 3
+        label2 = self.dataset['label_2'][index]
+        # label2 can be none, change it to -1
+        if label2 is None or label2 == "None":
+            label2 = -1
+        return {"labels": label, "labels2": int(label2)}
+
+    def __len__(self):
+        return len(self.dataset)
+
     @staticmethod
     def collate_fn(batch):
         return default_collate(list(
             filter(lambda x: x is not None, batch)
         ))
-    @staticmethod
-    def get_video(frame_dir, num_frames, transform, is_train):
+
+    def get_video(self, utterance, num_frames, transform, is_train):
+        session, _ = utterance.rsplit("_", 1)
+        frame_dir = os.path.join(
+            self.data_root, "video", self.split, session, utterance)
         frame_list = sample_frames(frame_dir, num_frames)
 
         frames = []
@@ -38,6 +58,23 @@ class CMU_MOSEI_Dataset(Dataset):
             if vflip:
                 torch.flip(frames, [2])
         return frames
+
+    def get_text(self, utterance):
+        session, _ = utterance.rsplit("_", 1)
+        text_dir = os.path.join(
+            self.data_root, "text", self.split, session, f"{utterance}.txt")
+        with open(text_dir) as f:
+            lines = f.readlines()
+        return lines[0]
+    
+    def get_raw_audio(self, utterance, max_audio_len):
+        session, _ = utterance.rsplit("_", 1)
+        audio_path = os.path.join(
+            self.data_root, "audio", self.split, session, f"{utterance}.wav")
+        signal, sample_rate = librosa.load(audio_path, sr=None, mono=True)
+        if len(signal) > max_audio_len:
+            signal = signal[-max_audio_len:]
+        return signal
 
     @staticmethod
     def get_batch_sampler(dataset, batch_size: int, shuffle: bool, **kwargs):
@@ -91,117 +128,45 @@ class SmartBatchSampler(Sampler):
     def shuffle(self, epoch):
         np.random.shuffle(self.bins)
 
-class CMU_MOSEI_VideoDataset(CMU_MOSEI_Dataset):
-    def __init__(self, task: str, split: str, csv_path, data_root, num_frames, target: str, transform=None, **kwargs):
-        self.task = task
-        self.csv_path = csv_path
-        self.dataset = pd.read_csv(csv_path, sep='\t', quoting=3, engine="python")
-        # data/CMU-MOSEI/cropped_frames/<split>
-        self.data_root = os.path.join(data_root, "cropped_frames", split)
-        self.train = (split == "train")
+
+class VideoDataset(MultiDataset):
+    def __init__(self, task: str, csv_path, data_root,
+           split, num_frames, transform=None, **kwargs):
+        super().__init__(task, csv_path, data_root, split)
+        self.is_train = (split == "train")
         self.num_frames = num_frames
         self.transform = transform
-        self.target = target
-
-    def __len__(self):
-        return len(self.dataset)
-    
-    def __getitem__(self, index):
-        # e.g. 9-K1CXCXui4_10
-        utterance = self.dataset['utterance_id'][index]
-        session, _ = utterance.rsplit("_", 1)
-        frame_dir = os.path.join(
-            self.data_root, session, utterance)
-        assert os.path.exists(frame_dir)
-        frames = type(self).get_video(
-            frame_dir, self.num_frames, self.transform, self.train
-        )
-        label = self.dataset[self.target][index]
-        if self.target == "label_2" and label == 'None':
-            return
-        elif self.target == "label_7":
-            # shift [-3, -2, -1, 0, 1, 2, 3] to [0, 1, 2, 3, 4, 5, 6]
-            label = int(label) + 3
-        
-        return {
-            "videos": frames,
-            "labels": int(label)
-        } 
-
-class CMU_MOSEI_AudioDataset(CMU_MOSEI_Dataset):
-    def __init__(self, task: str, split: str, csv_path, target: str, data_root: str, 
-            spec_aug=False, max_audio_len=8000, audio_format="raw", **kwargs):
-        self.task = task
-        self.csv_path = csv_path
-        # e.g. data/CMU-MOSEI/all_data
-        if audio_format == "raw":
-            self.data_root = os.path.join(data_root, "raw_audios", split)
-        elif audio_format == "fbank":
-            self.data_root = os.path.join(data_root, "FilterBank", split)
-        else:
-            raise NotImplementedError
-        # contains text directly
-        self.dataset = pd.read_csv(csv_path, sep='\t', quoting=3, engine="python")
-        self.spec_aug = spec_aug
-        self.max_audio_len = max_audio_len
-        self.train = (split == "train")
-        self.target = target
-        self.audio_format = audio_format
-
-    def __len__(self):
-        return len(self.dataset)
-    
-    def load_fbank(self, fbank_path):
-        if not os.path.exists(fbank_path):
-            return
-        # (#frames, #mel=80)
-        fbank = torch.load(fbank_path)
-        if fbank.size(0) > self.max_audio_len:
-            fbank = fbank[-self.max_audio_len:]
-        if fbank.std().item() == 0:
-            # ignore bad instances
-            return
-        fbank -= fbank.mean()
-        fbank /= fbank.std()
-
-        # use aug
-        if self.train and random.random() < 0.5:
-            from openspeech.data.audio.augment import SpecAugment
-            fbank = SpecAugment(freq_mask_para=27, time_mask_num=4, freq_mask_num=2)(fbank)
-        return fbank
-    
-    def load_raw(self, raw_path):
-        signal, sample_rate = librosa.load(raw_path, sr=None, mono=True)
-        if len(signal) > self.max_audio_len:
-            signal = signal[-self.max_audio_len:]
-        return signal
     
     def __getitem__(self, index):
         utterance = self.dataset['utterance_id'][index]
-        session, _ = utterance.rsplit("_", 1)
-        if self.audio_format == "fbank":
-            fbank_path = os.path.join(
-                self.data_root, session, f"{utterance}.pt")
-            audio = self.load_fbank(fbank_path)
-            if audio is None: return
-
-        elif self.audio_format == "raw":
-            raw_path = os.path.join(
-                self.data_root, session, f"{utterance}.wav")
-            audio = self.load_raw(raw_path)
-
-        label = self.dataset[self.target][index]
-        if self.target == "label_2" and label == 'None':
-            return
-        elif self.target == "label_7":
-            # shift [-3, -2, -1, 0, 1, 2, 3] to [0, 1, 2, 3, 4, 5, 6]
-            label = int(label) + 3
-
+        ret = super().__getitem__(index)
         return {
-            "audios": audio,
-            "labels": int(label)
+            **ret, "videos": self.get_video(utterance, self.num_frames, self.transform, self.is_train)
         }
 
+class TextDataset(MultiDataset):
+    def __getitem__(self, index):
+        utterance = self.dataset['utterance_id'][index]
+        ret = super().__getitem__(index)
+        return {
+            **ret, "text": self.get_text(utterance)
+        }
+
+class AudioDataset(MultiDataset):
+    def __init__(self, task: str, csv_path, data_root, 
+            split, spec_aug=False, max_audio_len=8000, audio_format="raw", **kwargs):
+        super().__init__(task, csv_path, data_root, split)
+        self.spec_aug = spec_aug
+        self.max_audio_len = max_audio_len
+        self.is_train = (split == "train")
+        self.audio_format = audio_format
+    def __getitem__(self, index):
+        utterance = self.dataset['utterance_id'][index]
+        ret = super().__getitem__(index)
+        return {
+            **ret, "audios": self.get_raw_audio(utterance, self.max_audio_len)
+        }
+    
     @staticmethod
     def collate_fn(batch, pad_idx=0):
         # for DDP: somehow make batch a dict not list of dict
@@ -212,10 +177,12 @@ class CMU_MOSEI_AudioDataset(CMU_MOSEI_Dataset):
         )
         if batch[0]["audios"].ndim == 1:
             # raw
-            return {
-                "audios": [b["audios"] for b in batch],
-                "labels": torch.tensor([b["labels"] for b in batch]),
+            ret = {
+                k: torch.tensor([b[k] for b in batch if k != "audios"])
+                for k in batch[0]
             }
+            ret["audios"] = [b['audios'] for b in batch]
+            return ret
         batch = sorted(batch, key=lambda x: x["audios"].size(0), reverse=True)
         max_seq_sample = max(batch, key=lambda x: x["audios"].size(0))['audios']
         max_seq_size, feat_size = max_seq_sample.shape
@@ -225,95 +192,31 @@ class CMU_MOSEI_AudioDataset(CMU_MOSEI_Dataset):
             audio = batch[i]["audios"]
             seq_length = audio.size(0)
             audios[i].narrow(0, 0, seq_length).copy_(audio)
-
         return {
             "labels": torch.tensor([x["labels"] for x in batch]).long(),
             "audios": audios,
             "audio_lengths": torch.tensor([len(x["audios"]) for x in batch]).long()
         }
 
-    @staticmethod
-    def get_batch_sampler(dataset, split, batch_size: int, shuffle: bool, cache_dir: str, use_smart_sampler: bool):
-        if use_smart_sampler:
-            sampler = SmartBatchSampler
-            sampler.split = split
-            sampler.cache_dir = cache_dir
-            return sampler(dataset, batch_size, drop_last=False)
-        return CMU_MOSEI_Dataset.get_batch_sampler(dataset, batch_size, shuffle)
-
-class CMU_MOSEI_TextDataset(CMU_MOSEI_Dataset):
-    def __init__(self, task: str, csv_path, target: str, **kwargs):
-        self.task = task
-        self.csv_path = csv_path
-        # contains text directly
-        self.dataset = pd.read_csv(csv_path, sep='\t', quoting=3, engine="python")
-        self.target = target
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, index):
-        label = self.dataset[self.target][index]
-        if self.target == "label_2" and label == 'None':
-            return
-        elif self.target == "label_7":
-            # shift [-3, -2, -1, 0, 1, 2, 3] to [0, 1, 2, 3, 4, 5, 6]
-            label = int(label) + 3
-
-        return {
-            "text": self.dataset["text"][index],
-            "labels": int(label)
-        }
-
-
-class CMU_MOSEI_VTDataset(CMU_MOSEI_Dataset):
-    def __init__(self, task: str, csv_path, data_root, train, num_frames: int, transform, target: str, **kwargs):
-        self.task = task
-        self.csv_path = csv_path
-        self.dataset = pd.read_csv(csv_path, sep='\t', quoting=3, engine="python")
-        # data/CMU-MOSEI/cropped_frames/<split>
-        self.data_root = data_root
-        self.train = train
-        self.num_frames = num_frames
-        self.transform = transform
-        self.target = target
-
-    def __len__(self):
-        return len(self.dataset)
-
+class ATDataset(AudioDataset):
     def __getitem__(self, index):
         utterance = self.dataset['utterance_id'][index]
-        session, _ = utterance.rsplit("_", 1)
-        frame_dir = os.path.join(
-            self.data_root, session, utterance)
-        assert os.path.exists(frame_dir)
-        frames = CMU_MOSEI_VideoDataset.get_video(
-            frame_dir, self.num_frames, self.transform, self.train
-        )
-        label = self.dataset[self.target][index]
-        if self.target == "label_2" and label == 'None':
-            return
-        elif self.target == "label_7":
-            # shift [-3, -2, -1, 0, 1, 2, 3] to [0, 1, 2, 3, 4, 5, 6]
-            label = int(label) + 3
-
+        ret = super().__getitem__(index)
         return {
-            "text": self.dataset["text"][index],
-            "videos": frames,
-            "labels": int(label)
+            **ret,
+            "text": self.get_text(utterance),
         }
 
-
-
-class CMU_MOSEI_DataModule(LightningDataModule):
+class DataModule(LightningDataModule):
     def __init__(
         self, task: str, modality: str,
         # dataset
         # where the csvs are and where the raw data are
         csv_dir: str = "dataset/", data_dir: str = "data/", 
-        num_frames: int = 16, image_size: int = 112, num_classes: int = -1,
+        # for video only
+        num_frames: int = 16, image_size: int = 112, 
         # dataloader
-        batch_size: int = 64, num_workers: int = 0, pin_memory: bool = False, 
+        batch_size: int = 64, num_workers: int = 0, pin_memory: bool = False,
         # for audio only
         spec_aug: bool = False, max_audio_len: int = 8000, audio_format: str = "raw", use_smart_sampler: bool = False, cache_dir: str = ".",
         **kwargs
@@ -321,7 +224,6 @@ class CMU_MOSEI_DataModule(LightningDataModule):
         assert os.path.exists(data_dir)
         assert os.path.exists(csv_dir)
         assert task in ["clf", "reg"]
-        assert num_classes in [1, 7]
         super().__init__()
 
         # this line allows to access init params with 'self.hparams' attribute
@@ -336,23 +238,19 @@ class CMU_MOSEI_DataModule(LightningDataModule):
 
         self.datasets: dict = {}
         self.modality2ds = {
-            "video": CMU_MOSEI_VideoDataset,
-            "text": CMU_MOSEI_TextDataset,
-            "audio": CMU_MOSEI_AudioDataset,
-            "vt": CMU_MOSEI_VTDataset
+            "video": VideoDataset,
+            "text": TextDataset,
+            "audio": AudioDataset,
+            "at": ATDataset
         }
 
     def setup(self, stage: Optional[str] = None):
         ds_cls = self.modality2ds[self.hparams.modality]
         for split in ["train", "val", "test"]:
-            target_label = f"label_{self.hparams.num_classes}"
-            data_root = self.hparams.data_dir
-
             self.datasets[split] = ds_cls(
-                self.hparams.task, split=split,
-                csv_path=os.path.join(self.hparams.csv_dir, f"post_{split}.csv"),
-                data_root=data_root, target=target_label,
-                num_frames=self.hparams.num_frames, transform=self.transforms,
+                self.hparams.task,
+                self.hparams.csv_dir, self.hparams.data_dir, 
+                split=split, num_frames=self.hparams.num_frames, transform=self.transforms,
                 spec_aug=self.hparams.spec_aug, max_audio_len=self.hparams.max_audio_len, audio_format=self.hparams.audio_format
             )
     

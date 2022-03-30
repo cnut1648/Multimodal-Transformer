@@ -32,7 +32,7 @@ audio_lens = []
 #     dataset = dataset.append( pd.read_csv(csv_path))
 # dataset.reset_index(inplace=True)
 
-
+frame_lost = 0
 for sessionid in [1, 2, 3, 4, 5]:
     csv_path = csv_dir / f"Session{sessionid}.csv"
     dataset = pd.read_csv(csv_path)
@@ -69,7 +69,8 @@ for sessionid in [1, 2, 3, 4, 5]:
         if not os.path.exists(frame_dir):
             bad_indexs.append(index)
             continue
-        if len(os.listdir(frame_dir)) < 8:
+        if len(os.listdir(frame_dir)) < 16:
+            frame_lost += 1
             bad_indexs.append(index)
             continue
         
@@ -109,3 +110,4 @@ for sessionid in [1, 2, 3, 4, 5]:
     intersection.to_csv(
         str(csv_dir / f"post_session{sessionid}.csv"), index=False
     )
+print(frame_lost)

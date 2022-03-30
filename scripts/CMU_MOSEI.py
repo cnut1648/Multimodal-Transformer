@@ -7,12 +7,15 @@ from pathlib import Path
 import librosa
 import pandas as pd
 
-csv_dir = Path("/home/ICT2000/jxu/PER/data/CMU-MOSEI/all_data")
-data_root = Path("/home/ICT2000/jxu/PER/data/CMU-MOSEI/all_data")
+pwd = Path(__file__).parent
+csv_dir = pwd / "../data/datasets/CMU-MOSEI"
+data_root = pwd / "../data/data/CMU-MOSEI"
+audio_lens = []
 max_audio_len = 4000
+frame_lost = 0
 
 for split in ["train", "val", "test"]:
-    csv_path = csv_dir / f"all_{split}.csv"
+    csv_path = csv_dir / f"{split}.csv"
     dataset = pd.read_csv(csv_path, sep='\t', quoting=3, engine="python")
     bad_indexs = []
     for index in range(len(dataset)):
@@ -21,16 +24,35 @@ for split in ["train", "val", "test"]:
         """
         text always have
         """
+        text_dir = os.path.join(
+            data_root, "text", split, session, f"{utterance}.txt")
+        if not os.path.exists(text_dir):
+            bad_indexs.append(index)
+            continue
+        with open(text_dir) as f:
+            try:
+                lines = f.readlines()
+            except UnicodeDecodeError:
+                # foreign words, ignore
+                bad_indexs.append(index)
+                continue
+        if len(lines) == 0:
+            bad_indexs.append(index)
+            continue
 
         """
         video
         """
         frame_dir = os.path.join(
-            data_root, "cropped_frames", split, session, utterance)
+            data_root, "video", split, session, utterance)
         if not os.path.exists(frame_dir):
             bad_indexs.append(index)
             continue
-        
+        if len(os.listdir(frame_dir)) < 16:
+            bad_indexs.append(index)
+            frame_lost += 1
+            continue 
+
         """
         audio fbank
         """
@@ -50,7 +72,7 @@ for split in ["train", "val", "test"]:
         audio raw
         """
         audio_path = os.path.join(
-            data_root, "raw_audios", split, session, f"{utterance}.wav")
+            data_root, "audio", split, session, f"{utterance}.wav")
         if not os.path.exists(audio_path):
             bad_indexs.append(index)
             continue
@@ -65,3 +87,4 @@ for split in ["train", "val", "test"]:
     intersection.to_csv(
         str(csv_dir / f"post_{split}.csv"), sep="\t", quoting=3, index=False
     )
+print(frame_lost)

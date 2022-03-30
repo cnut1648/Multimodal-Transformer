@@ -146,7 +146,6 @@ dmypy.json
 # Lightning-Hydra-Template
 configs/local/default.yaml
 data/
-logs/
 wandb/
 .env
 .autoenv
@@ -156,3 +155,4 @@ openspeech/
 run2.py
 selected_ckpt/
 .vscode/
+logs

@@ -11,7 +11,14 @@ windows:
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./audio.sh 1 iemocap 8 1e-2 2,3,4,5
+        ./audio.sh 0 mosei 8,16 1e-3 1
+  - window_name: t
+    # focus: true
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./audio.sh 6 mosei 8,16 1e-4 1
   ####################################################################################################
   # face
   # cuda, ds, acc grad (bsz=32), lr, [folds=1,2,3,4,5]
@@ -22,7 +29,7 @@ windows:
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 5 iemocap 4 1e-6 1
+        ./video.sh 3 mosei 2 1e-4 1
   ####################################################################################################
   # text
   # cuda, ds, acc grad (bsz=16), lr, [folds=1,2,3,4,5]
@@ -33,4 +40,4 @@ windows:
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./text.sh 2 iemocap 4 0.001 3,4,5
+        ./text.sh 4 mosei 4,8 1e-2 1
