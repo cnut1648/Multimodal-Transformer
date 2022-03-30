@@ -23,7 +23,7 @@ if [[ $ds == "iemocap" ]]; then
 elif [[ $ds == "mosei" ]]; then
     echo "mosei";
     bsz=16;
-    exp=cmu_mosei_l1;
+    exp=cmu_mosei_clf7;
     folds=1
 else
     echo "unknown ds";
