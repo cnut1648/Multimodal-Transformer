@@ -29,7 +29,7 @@ windows:
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 3 mosei 4,8 1e-4 1
+        ./video.sh 3 mosei 4 1e-5 1
   - window_name: v
     # focus: true
     window_shell: /bin/bash
@@ -47,7 +47,7 @@ windows:
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./text.sh 0 mosei 4 1e-3,1e-4,1e-5 1
+        ./text.sh 7 mosei 4,8 1e-5 1
   - window_name: t
     # focus: true
     window_shell: /bin/bash

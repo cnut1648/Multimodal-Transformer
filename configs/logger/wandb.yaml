@@ -17,4 +17,4 @@ wandb:
     - ${datamodule.task}
     - ${name}
     - "fold-${datamodule.fold}"
-    - K=${datamodule.num_classes}
+    - K=${model.num_classes}
