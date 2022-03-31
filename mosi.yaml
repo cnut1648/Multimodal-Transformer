@@ -29,14 +29,14 @@ windows:
   #   panes:
   #     - >
   #       sleep $(seq 1 30 | shuf -n 1);
-  #       ./video.sh 3 mosei 4 1e-5 1
+  #       ./video.sh 3 mosi 4 1e-5,1e-4 1
   # - window_name: v
   #   # focus: true
   #   window_shell: /bin/bash
   #   panes:
   #     - >
   #       sleep $(seq 1 30 | shuf -n 1);
-  #       ./video.sh 4 mosei 4 1e-3,1e-2,1e-5 1
+  #       ./video.sh 4 mosi 4 1e-3,1e-2,1e-5 1
   ####################################################################################################
   # text
   # cuda, ds, acc grad (bsz=16), lr, [folds=1,2,3,4,5]

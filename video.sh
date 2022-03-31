@@ -24,6 +24,11 @@ elif [[ $ds == "mosei" ]]; then
     bsz=32;
     exp=cmu_mosei_clf7;
     folds=1
+elif [[ $ds == "mosi" ]]; then
+    echo "mosi";
+    bsz=32;
+    exp=cmu_mosi_clf7;
+    folds=1
 else
     echo "unknown ds";
     exit 0;
