@@ -36,7 +36,7 @@ class BaseModule(ModuleMetricMixin, LightningModule):
             elif ordinal_regression == "corn":
                 self.criterion = corn_loss
                 self.model.replace_linear(torch.nn.Linear, num_classes-1)
-            elif dataset == "cmu_mosei" and num_classes == 1:
+            elif dataset in ["cmu_mosei", "cmu_mosi"] and num_classes == 1:
                 self.criterion = torch.nn.L1Loss()
             else:
                 # vanila clf
@@ -74,7 +74,7 @@ class BaseModule(ModuleMetricMixin, LightningModule):
         elif self.hparams.ordinal_regression == "corn":
             loss = self.criterion(logits, labels, num_classes=self.hparams.num_classes)
             preds = corn_label_from_logits(logits)
-        elif self.hparams.dataset == "cmu_mosei" and self.hparams.num_classes == 1:
+        elif self.hparams.dataset in ["cmu_mosei", "cmu_mosi"] and self.hparams.num_classes == 1:
             assert logits.size(1) == 1
             loss = self.criterion(logits, labels)
             # labels [0, 6], thus clip [0, 6], (bsz, 1) to (bsz, )
@@ -93,7 +93,7 @@ class BaseModule(ModuleMetricMixin, LightningModule):
         loss, preds = self.postprocess_logits(logits, labels)
         self.log(f"{split}/step/loss", loss, on_step=True, on_epoch=False, prog_bar=False, sync_dist=True)
         ret = {"loss": loss, "preds": preds, "targets": labels}
-        if self.hparams.dataset == "cmu_mosei":
+        if self.hparams.dataset in ["cmu_mosei", "cmu_mosi"]:
             assert "labels2" in batch
             ret.update({"labels2": batch['labels2']})
         return ret
@@ -107,8 +107,9 @@ class BaseModule(ModuleMetricMixin, LightningModule):
         if split != "test":
             self.mean_losses[f"{split}_losses"](losses)
         self.metrics[f"{split}_metrics"](preds, labels)
-        if self.hparams.dataset == "cmu_mosei":
-            self.metrics[f"{split}_mosei"](preds, labels, outputs["labels2"])
+        if self.hparams.dataset in ["cmu_mosei", "cmu_mosi"]:
+            metricname = f"{split}_{self.hparams.dataset.replace('cmu_','')}"
+            self.metrics[metricname](preds, labels, outputs["labels2"])
 
     def agg_epoch(self, outputs: List[Any], split: str):
         # t = torch.cat([o["targets"] for o in outputs]).cpu().numpy()
@@ -126,12 +127,13 @@ class BaseModule(ModuleMetricMixin, LightningModule):
                 splitname, k = k.split("/")
                 metrics[f"{splitname}/classwise/{k}"] = value
         self.metrics[f"{split}_metrics"].reset()
-        if self.hparams.dataset == "cmu_mosei":
+        if self.hparams.dataset in ["cmu_mosei", "cmu_mosi"]:
+            metricname = f"{split}_{self.hparams.dataset.replace('cmu_','')}"
             # eg {'corr': nan, 'acc2': 0.46153846153846156, 'f12': 0.291497975708502}
-            mosei_metric = self.metrics[f"{split}_mosei"].compute()
+            mosei_metric = self.metrics[metricname].compute()
             for name, value in mosei_metric.items():
                 metrics[f"{split}/{name}"] = value
-            self.metrics[f"{split}_mosei"].reset()
+            self.metrics[metricname].reset()
 
         self.log_dict(metrics, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
     

@@ -43,6 +43,7 @@ CUDA_VISIBLE_DEVICES=$cuda /home/ICT2000/jxu/miniconda3/envs/benchmark/bin/pytho
     model.optim.lr=$lr \
     model.optim.weight_decay=0.01 \
     trainer=$trainer \
+    trainer.gradient_clip_val=0.1 \
     trainer.accumulate_grad_batches=$acc \
     datamodule.fold=$folds;
 

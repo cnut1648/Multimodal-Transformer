@@ -1,0 +1,57 @@
+session_name: IEMOCAP
+shell_command_before: "source ~/.bashrc"
+windows:
+  ####################################################################################################
+  # audio
+  # cuda, ds, acc grad (bsz=4), lr, [folds=1,2,3,4,5]
+  ####################################################################################################
+  - window_name: a
+    # focus: true
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./audio.sh 1 mosi 1 1e-5 1
+  - window_name: a
+    # focus: true
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./audio2.sh 2 mosi 1 1e-5 1
+  ####################################################################################################
+  # face
+  # cuda, ds, acc grad (bsz=32), lr, [folds=1,2,3,4,5]
+  ####################################################################################################
+  # - window_name: v
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./video.sh 3 mosei 4 1e-5 1
+  # - window_name: v
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./video.sh 4 mosei 4 1e-3,1e-2,1e-5 1
+  ####################################################################################################
+  # text
+  # cuda, ds, acc grad (bsz=16), lr, [folds=1,2,3,4,5]
+  ####################################################################################################
+  # - window_name: t
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./text.sh 7 mosi 4 0.0001 1
+  # - window_name: t
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./text.sh 1 mosi 4 0.0005 1

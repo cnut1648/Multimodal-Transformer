@@ -1,0 +1,15 @@
+_target_: src.datamodules.cmu_mosi_datamodule.DataModule
+
+task: clf
+fold: 1
+modality: ${model.modality}
+dataset: cmu_mosi
+num_classes: 7
+# dataset
+data_dir: ${data_dir}/CMU-MOSI
+csv_dir: ${csv_dir}/CMU-MOSI
+
+# dataloader
+batch_size: 32
+num_workers: 1
+pin_memory: True

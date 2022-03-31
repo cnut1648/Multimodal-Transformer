@@ -21,7 +21,7 @@ class MOSEIMetric(Metric):
 
     def update(self, preds: torch.Tensor, target7: torch.Tensor, target2: torch.Tensor):
         """
-        all (bsz, )
+        all (bsz, ), preds & target7 0-6 int, target2 -1, 0, 1 where -1 means None (exclude from calc)
         """
         assert preds.shape == target7.shape == target2.shape
         assert preds.ndim == 1
@@ -107,7 +107,7 @@ class ModuleMetricMixin:
         **kwargs
     ):
         assert task in ["clf", "reg"]
-        assert dataset in ["msp_improv", "cmu_mosei", "iemocap"]
+        assert dataset in ["msp_improv", "cmu_mosei", "iemocap", "cmu_mosi"]
         super().__init__()
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
@@ -128,7 +128,7 @@ class ModuleMetricMixin:
                 assert ordinal_regression is None
                 assert num_classes == 4
                 labels = ["neutral", "angry", "sad", "happy"]
-            elif dataset == "cmu_mosei":
+            elif dataset in ["cmu_mosei", "cmu_mosi"]: # similar setting for those two
                 if num_classes == 7:
                     assert ordinal_regression in [None, "None", "coral", "corn"], f"ordinal regression is {ordinal_regression}, type={type(ordinal_regression)}"
                 elif num_classes == 1:
@@ -143,7 +143,8 @@ class ModuleMetricMixin:
                     **additional_metrics,
                     "MAE": MeanAbsoluteError(),
                 }
-                dataset_specific_metrics = ("mosei", MOSEIMetric(compute_on_step=False))
+                dataset_specific_metrics = (
+                    dataset.replace("cmu_", ""), MOSEIMetric(compute_on_step=False))
                 
             # iemocap
             else:
