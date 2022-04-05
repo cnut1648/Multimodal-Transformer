@@ -34,6 +34,7 @@ class AudioModule(BaseModule):
             _convert_="all"
         )
 
+        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt)
         scheduler = get_linear_schedule_with_warmup(
             # TODO warmup
             opt, num_warmup_steps=math.ceil(self.total_steps * 0.2), num_training_steps=self.total_steps

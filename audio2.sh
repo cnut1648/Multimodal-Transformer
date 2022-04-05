@@ -40,10 +40,12 @@ echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 CUDA_VISIBLE_DEVICES=$cuda /home/ICT2000/jxu/miniconda3/envs/benchmark/bin/python run.py -m \
     exp=$exp modal=a_hubert \
     datamodule.batch_size=$bsz \
+    datamodule.max_audio_len=250000 \
     model.optim.lr=$lr \
     model.optim.weight_decay=0.01 \
     trainer=$trainer \
     trainer.gradient_clip_val=0.1 \
+    seed=0 \
     trainer.accumulate_grad_batches=$acc \
     datamodule.fold=$folds;
 

@@ -1,4 +1,4 @@
-_target_: src.datamodules.msp_improv_datamodule.MSP_IMPROV_DataModule
+_target_: src.datamodules.msp_improv_datamodule.DataModule
 
 task: clf
 num_classes: 4
@@ -7,14 +7,9 @@ fold: 1
 modality: ${model.modality}
 # dataset
 data_dir: ${data_dir}/MSP-IMPROV
-csv_dir: ${data_dir}/MSP-IMPROV_label
+csv_dir: ${csv_dir}/MSP-IMPROV_12fold
 
 # dataloader
 batch_size: 32
 num_workers: 1
 pin_memory: True
-
-# only for video
-num_frames: 16
-image_size: 112
-

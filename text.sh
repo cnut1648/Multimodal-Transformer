@@ -17,9 +17,11 @@ if [[ $ds == "iemocap" ]]; then
     exp=iemocap_clf;
     # tune on one fold first
     folds=${5:-1,2,3,4,5}
-    # folds="1,2,3,4,5"
-    # folds=1
-    # folds=2,3,4,5
+elif [[ $ds == "msp" ]]; then
+    echo "msp";
+    bsz=4;
+    exp=msp_improv_clf;
+    folds=${5:-1,2,3,4,5,6,7,8,9,10,11,12}
 elif [[ $ds == "mosei" ]]; then
     echo "mosei";
     bsz=16;

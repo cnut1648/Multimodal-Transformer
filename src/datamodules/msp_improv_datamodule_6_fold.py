@@ -23,18 +23,12 @@ def get_meta(utterance):
 
 # kfold: [train, val]
 FOLD_META = {
-    1: [['1F', '1M', '2F', '2M', '3F', '3M', '4F', '4M', '5F', '5M', '6F'], ['6M']],
-    2: [['1M', '2F', '2M', '3F', '3M', '4F', '4M', '5F', '5M', '6F', '6M'], ['1F']],
-    3: [['2F', '2M', '3F', '3M', '4F', '4M', '5F', '5M', '6F', '6M', '1F'], ['1M']],
-    4: [['2M', '3F', '3M', '4F', '4M', '5F', '5M', '6F', '6M', '1F', '1M'], ['2F']],
-    5: [['3F', '3M', '4F', '4M', '5F', '5M', '6F', '6M', '1F', '1M', '2F'], ['2M']],
-    6: [['3M', '4F', '4M', '5F', '5M', '6F', '6M', '1F', '1M', '2F', '2M'], ['3F']],
-    7: [['4F', '4M', '5F', '5M', '6F', '6M', '1F', '1M', '2F', '2M', '3F'], ['3M']],
-    8: [['4M', '5F', '5M', '6F', '6M', '1F', '1M', '2F', '2M', '3F', '3M'], ['4F']],
-    9: [['5F', '5M', '6F', '6M', '1F', '1M', '2F', '2M', '3F', '3M', '4F'], ['4M']],
-    10: [['5M', '6F', '6M', '1F', '1M', '2F', '2M', '3F', '3M', '4F', '4M'], ['5F']],
-    11: [['6F', '6M', '1F', '1M', '2F', '2M', '3F', '3M', '4F', '4M', '5F'], ['5M']],
-    12: [['6M', '1F', '1M', '2F', '2M', '3F', '3M', '4F', '4M', '5F', '5M'], ['6F']],
+    1: [[1, 2, 3, 4, 5], 6],
+    2: [[2, 3, 4, 5, 6], 1],
+    3: [[3, 4, 5, 6, 1], 2],
+    4: [[4, 5, 6, 1, 2], 3],
+    5: [[5, 6, 1, 2, 3], 4],
+    6: [[6, 1, 2, 3, 4], 5]
 }
 
 class MultiDataset(Dataset):
@@ -211,7 +205,7 @@ class DataModule(LightningDataModule):
         assert os.path.exists(data_dir)
         assert os.path.exists(csv_dir)
         assert task in ["clf"]
-        assert fold in range(1, 13)
+        assert fold in [1, 2, 3, 4, 5, 6]
         super().__init__()
 
         # this line allows to access init params with 'self.hparams' attribute
