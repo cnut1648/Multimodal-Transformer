@@ -1,0 +1,16 @@
+_target_: src.datamodules.ntu_rgb_datamodule.DataModule
+
+task: clf
+num_classes: 60
+dataset: ntu_rgb
+# or xsub
+fold: xview
+modality: ${model.modality}
+# dataset
+data_dir: ${data_dir}/NTU RGB+D
+csv_dir: ${csv_dir}/NTU RGB+D
+
+# dataloader
+batch_size: 32
+num_workers: 1
+pin_memory: True

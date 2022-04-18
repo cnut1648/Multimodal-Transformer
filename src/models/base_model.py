@@ -37,7 +37,8 @@ class BaseModule(ModuleMetricMixin, LightningModule):
                 self.criterion = corn_loss
                 self.model.replace_linear(torch.nn.Linear, num_classes-1)
             elif dataset in ["cmu_mosei", "cmu_mosi"] and num_classes == 1:
-                self.criterion = torch.nn.L1Loss()
+                # self.criterion = torch.nn.L1Loss()
+                self.criterion = torch.nn.MSELoss()
             else:
                 # vanila clf
                 self.criterion = torch.nn.CrossEntropyLoss()
@@ -62,7 +63,8 @@ class BaseModule(ModuleMetricMixin, LightningModule):
     
     def postprocess_logits(self, logits, labels):
         """
-        compute loss and preds
+        compute loss and preds and labels
+        since using metrics, ensure labels are positive
         """
         if self.hparams.task == "reg":
             loss = self.criterion(logits, labels)
@@ -76,13 +78,15 @@ class BaseModule(ModuleMetricMixin, LightningModule):
             preds = corn_label_from_logits(logits)
         elif self.hparams.dataset in ["cmu_mosei", "cmu_mosi"] and self.hparams.num_classes == 1:
             assert logits.size(1) == 1
-            loss = self.criterion(logits, labels)
+            # loss = self.criterion(logits, labels)
+            loss = self.criterion(logits, labels.float())
             # labels [0, 6], thus clip [0, 6], (bsz, 1) to (bsz, )
-            preds = logits.clip(0., 6.).round().squeeze(-1).long()
+            preds = logits.clip(-3., 3.).round().squeeze(-1).long() + 3
+            labels = labels.clip(-3., 3.).round().long() + 3
         else:
             loss = self.criterion(logits, labels)
             preds = torch.argmax(logits, dim=1)
-        return loss, preds
+        return loss, preds, labels
 
     def compute_step(self, batch: Any, split: str):
         """
@@ -90,7 +94,7 @@ class BaseModule(ModuleMetricMixin, LightningModule):
         """
         batch, labels = self.preprocess_batch(batch)
         logits = self.forward(batch)
-        loss, preds = self.postprocess_logits(logits, labels)
+        loss, preds, labels = self.postprocess_logits(logits, labels)
         self.log(f"{split}/step/loss", loss, on_step=True, on_epoch=False, prog_bar=False, sync_dist=True)
         ret = {"loss": loss, "preds": preds, "targets": labels}
         if self.hparams.dataset in ["cmu_mosei", "cmu_mosi"]:

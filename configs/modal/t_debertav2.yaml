@@ -1,0 +1,12 @@
+# @package _global_
+
+
+defaults:
+  - override /model: text
+  - override /model/scheduler: null
+  - override /model/optim: adamw
+  - override /model/model: roberta
+
+model:
+  model:
+    arch_name: microsoft/deberta-v3-large

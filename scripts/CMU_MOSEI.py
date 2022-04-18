@@ -15,7 +15,7 @@ max_audio_len = 4000
 frame_lost = 0
 
 for split in ["train", "val", "test"]:
-    csv_path = csv_dir / f"{split}.csv"
+    csv_path = csv_dir / f"all_{split}.csv"
     dataset = pd.read_csv(csv_path, sep='\t', quoting=3, engine="python")
     bad_indexs = []
     for index in range(len(dataset)):
@@ -43,15 +43,15 @@ for split in ["train", "val", "test"]:
         """
         video
         """
-        frame_dir = os.path.join(
-            data_root, "video", split, session, utterance)
-        if not os.path.exists(frame_dir):
-            bad_indexs.append(index)
-            continue
-        if len(os.listdir(frame_dir)) < 16:
-            bad_indexs.append(index)
-            frame_lost += 1
-            continue 
+        # frame_dir = os.path.join(
+        #     data_root, "video", split, session, utterance)
+        # if not os.path.exists(frame_dir):
+        #     bad_indexs.append(index)
+        #     continue
+        # if len(os.listdir(frame_dir)) < 16:
+        #     bad_indexs.append(index)
+        #     frame_lost += 1
+        #     continue 
 
         """
         audio fbank
@@ -71,20 +71,20 @@ for split in ["train", "val", "test"]:
         """
         audio raw
         """
-        audio_path = os.path.join(
-            data_root, "audio", split, session, f"{utterance}.wav")
-        if not os.path.exists(audio_path):
-            bad_indexs.append(index)
-            continue
-        signal, sample_rate = librosa.load(audio_path, sr=None)
-        assert sample_rate == 16000
-        if len(signal) == 0:
-            bad_indexs.append(index)
-            continue
+        # audio_path = os.path.join(
+        #     data_root, "audio", split, session, f"{utterance}.wav")
+        # if not os.path.exists(audio_path):
+        #     bad_indexs.append(index)
+        #     continue
+        # signal, sample_rate = librosa.load(audio_path, sr=None)
+        # assert sample_rate == 16000
+        # if len(signal) == 0:
+        #     bad_indexs.append(index)
+        #     continue
         
     bad_indexs = dataset.index.isin(bad_indexs)
     intersection = dataset[~bad_indexs]
     intersection.to_csv(
-        str(csv_dir / f"post_{split}.csv"), sep="\t", quoting=3, index=False
+        str(csv_dir / f"post_{split}_fulltext.csv"), sep="\t", quoting=3, index=False
     )
 print(frame_lost)

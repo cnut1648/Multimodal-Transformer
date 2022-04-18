@@ -1,4 +1,4 @@
-session_name: IEMOCAP
+session_name: mosi
 shell_command_before: "source ~/.bashrc"
 windows:
   ####################################################################################################
@@ -54,11 +54,18 @@ windows:
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./text2.sh 2 mosi 4 5e-5,5e-4,1e-4 1
-  - window_name: t
-    # focus: true
-    window_shell: /bin/bash
-    panes:
-      - >
-        sleep $(seq 1 30 | shuf -n 1);
-        ./text2.sh 0 mosei 4 5e-5,5e-4,1e-4 1
+        ./text_roberta_l2.sh 4 mosi 4,8,16 1e-3,5e-3,1e-2,5e-2 1;
+  # - window_name: t
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./text_bert_l2.sh 6 mosi 4 1e-5,5e-4,1e-4,5e-5 1;
+  # - window_name: t
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./text2.sh 0 mosei 4 5e-5,5e-4,1e-4 1

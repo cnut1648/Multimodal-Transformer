@@ -13,29 +13,25 @@ fi;
 
 if [[ $ds == "iemocap" ]]; then
     echo "iemocap";
-    bsz=32;
+    bsz=16;
     exp=iemocap_clf;
+    # tune on one fold first
     folds=${5:-1,2,3,4,5}
 elif [[ $ds == "msp" ]]; then
     echo "msp";
     bsz=4;
     exp=msp_improv_clf;
-    folds=${5:-1,2,3,4,5,6,7,8,9,10,11,12}
+    folds=${5:-1,2,3,4,5,6}
 elif [[ $ds == "mosei" ]]; then
     echo "mosei";
-    bsz=32;
-    exp=cmu_mosei_clf7;
+    bsz=16;
+    exp=cmu_mosei_l1;
     folds=1
 elif [[ $ds == "mosi" ]]; then
     echo "mosi";
     bsz=32;
-    exp=cmu_mosi_clf7;
+    exp=cmu_mosi_l1;
     folds=1
-elif [[ $ds == "nturgb" ]]; then
-    echo "ntu rgb";
-    bsz=32;
-    exp=ntu_rgb60_clf;
-    folds=${5:xview,xsub}
 else
     echo "unknown ds";
     exit 0;
@@ -45,12 +41,10 @@ echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 echo "cuda=$cuda $exp FOLD$folds+[bsz=$bsz, acc=$acc, lr=$lr]";
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++";
 CUDA_VISIBLE_DEVICES=$cuda /home/ICT2000/jxu/miniconda3/envs/benchmark/bin/python run.py -m \
-    exp=$exp modal=v_timesformer \
+    exp=$exp modal=t_roberta \
     datamodule.batch_size=$bsz \
     model.optim.lr=$lr \
     model.optim.weight_decay=0.01 \
     trainer=$trainer \
     trainer.accumulate_grad_batches=$acc \
     datamodule.fold=$folds;
-
-    # mode=test_without_fit \

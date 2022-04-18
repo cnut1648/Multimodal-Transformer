@@ -107,7 +107,7 @@ class ModuleMetricMixin:
         **kwargs
     ):
         assert task in ["clf", "reg"]
-        assert dataset in ["msp_improv", "cmu_mosei", "iemocap", "cmu_mosi"]
+        assert dataset in ["msp_improv", "cmu_mosei", "iemocap", "cmu_mosi", "ntu_rgb"]
         super().__init__()
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
@@ -124,6 +124,8 @@ class ModuleMetricMixin:
             }, prefix="train/")
         else:
             additional_metrics = {}
+            # optional store classwise metric
+            labels = None
             if dataset == "msp_improv": 
                 assert ordinal_regression is None
                 assert num_classes == 4
@@ -145,13 +147,19 @@ class ModuleMetricMixin:
                 }
                 dataset_specific_metrics = (
                     dataset.replace("cmu_", ""), MOSEIMetric(compute_on_step=False))
-                
+            elif dataset == "ntu_rgb":
+                assert num_classes == 60
             # iemocap
             else:
                 assert ordinal_regression is None
                 assert num_classes == 4
                 labels = ["neu", "sad", "ang", "hap"]
-
+            
+            if labels is not None:
+                additional_metrics.update({
+                    "classwise_acc": ClasswiseWrapper(Accuracy(num_classes=num_classes, average=None), labels),
+                    "classwise_f1": ClasswiseWrapper(F1Score(num_classes=num_classes, average=None), labels),
+                })
             train_metrics = MetricCollection({
                 # weighted acc, reported in MOSEI
                 "WA": Accuracy(num_classes=num_classes, threshold=0.5, average="weighted"),
@@ -161,8 +169,6 @@ class ModuleMetricMixin:
                 "Recall": Recall(num_classes=num_classes, threshold=0.5, average="weighted"),
                 # weighted F1
                 "WF1": F1Score(num_classes=num_classes, threshold=0.5, average="weighted"),
-                "classwise_acc": ClasswiseWrapper(Accuracy(num_classes=num_classes, average=None), labels),
-                "classwise_f1": ClasswiseWrapper(F1Score(num_classes=num_classes, average=None), labels),
                 **additional_metrics
             }, prefix="train/")
 

@@ -1,17 +1,17 @@
-session_name: IEMOCAP
+session_name: MOSEI
 shell_command_before: "source ~/.bashrc"
 windows:
   ####################################################################################################
   # audio
   # cuda, ds, acc grad (bsz=4), lr, [folds=1,2,3,4,5]
   ####################################################################################################
-  - window_name: a
-    # focus: true
-    window_shell: /bin/bash
-    panes:
-      - >
-        sleep $(seq 1 30 | shuf -n 1);
-        ./audio.sh 6 mosei 1 1e-5 1
+  # - window_name: a
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./audio.sh 6 mosei 1 1e-5 1
   # - window_name: t
   #   # focus: true
   #   window_shell: /bin/bash
@@ -23,20 +23,20 @@ windows:
   # face
   # cuda, ds, acc grad (bsz=32), lr, [folds=1,2,3,4,5]
   ####################################################################################################
-  - window_name: v
-    # focus: true
-    window_shell: /bin/bash
-    panes:
-      - >
-        sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 3 mosei 4 1e-5 1
-  - window_name: v
-    # focus: true
-    window_shell: /bin/bash
-    panes:
-      - >
-        sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 4 mosei 4 1e-3,1e-2,1e-5 1
+  # - window_name: v
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./video.sh 3 mosei 4 1e-5 1
+  # - window_name: v
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./video.sh 4 mosei 4 1e-3,1e-2,1e-5 1
   ####################################################################################################
   # text
   # cuda, ds, acc grad (bsz=16), lr, [folds=1,2,3,4,5]
@@ -47,11 +47,13 @@ windows:
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./text.sh 7 mosei 4,8 1e-5 1
+        ./text.sh 0 mosei 5 1e-5,1e-4,5e-5,5e-4 1;
+        ./text_bert_ce.sh 0 mosei 4 1e-5,1e-4,5e-5,5e-4 1;
   - window_name: t
     # focus: true
     window_shell: /bin/bash
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./text.sh 2 mosei 4 5e-3,5e-4,5e-5 1
+        ./text_bert_l2.sh 1 mosei 4 1e-5,1e-4,5e-5,5e-4 1;
+        ./text_roberta_l2.sh 1 mosei 4 1e-5,1e-4,5e-5,5e-4 1;

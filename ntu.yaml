@@ -1,0 +1,25 @@
+session_name: ntu
+shell_command_before: "source ~/.bashrc"
+windows:
+  ####################################################################################################
+  # face
+  # cuda, ds, acc grad (bsz=32), lr, [folds=1,2,3,4,5]
+  ####################################################################################################
+  - window_name: v
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./video.sh 0 nturgb 4 1e-2,1e-3,1e-4,1e-5 xview
+  - window_name: v
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./video.sh 2 nturgb 4 5e-2,5e-3,5e-4,5e-5 xview
+  - window_name: v
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./video.sh 1 nturgb 4 1e-2,1e-3,1e-4,1e-5 xsub

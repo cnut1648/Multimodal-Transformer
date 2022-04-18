@@ -16,15 +16,16 @@ from torch.utils.data.dataloader import default_collate
 class MultiDataset(Dataset):
     def __init__(self, task: str, csv_path, data_root, split, **kwargs):
         self.task = task
-        self.dataset = pd.read_csv(os.path.join(csv_path, f"post_{split}.csv"), sep='\t', quoting=3, engine="python")
+        self.dataset = pd.read_csv(os.path.join(csv_path, f"post_{split}_fulltext.csv"), sep='\t', quoting=3, engine="python")
         self.dataset.reset_index(inplace=True)
         self.data_root = data_root
         self.split = split
 
     def __getitem__(self, index):
-        label = int(self.dataset['label_7'][index])
+        # label = int(self.dataset['label_7'][index])
         # shift [-3, -2, -1, 0, 1, 2, 3] to [0, 1, 2, 3, 4, 5, 6]
-        label = int(label) + 3
+        # label = int(label) + 3
+        label = self.dataset['label'][index]
         label2 = self.dataset['label_2'][index]
         # label2 can be none, change it to -1
         if label2 is None or label2 == "None":
