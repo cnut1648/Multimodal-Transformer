@@ -11,6 +11,7 @@ else
     trainer="default"
 fi;
 
+pretrain="/shares/perception/yufeng/project/personalized_emotion_recognition/myTimesFormer/checkpoints/Aff-Wild2.pyth"
 if [[ $ds == "iemocap" ]]; then
     echo "iemocap";
     bsz=32;
@@ -33,9 +34,10 @@ elif [[ $ds == "mosi" ]]; then
     folds=1
 elif [[ $ds == "nturgb" ]]; then
     echo "ntu rgb";
-    bsz=32;
+    bsz=4;
     exp=ntu_rgb60_clf;
-    folds=${5:xview,xsub}
+    folds=${5:xview,xsub};
+    pretrain="/shares/perception/yufeng/project/personalized_emotion_recognition/myTimesFormer/checkpoints/K600.pyth"
 else
     echo "unknown ds";
     exit 0;
@@ -45,7 +47,8 @@ echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 echo "cuda=$cuda $exp FOLD$folds+[bsz=$bsz, acc=$acc, lr=$lr]";
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++";
 CUDA_VISIBLE_DEVICES=$cuda /home/ICT2000/jxu/miniconda3/envs/benchmark/bin/python run.py -m \
-    exp=$exp modal=v_timesformer \
+    modal=v_timesformer \
+    exp=$exp model.model.pretrained_model=$pretrain \
     datamodule.batch_size=$bsz \
     model.optim.lr=$lr \
     model.optim.weight_decay=0.01 \
