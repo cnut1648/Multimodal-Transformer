@@ -1,37 +1,25 @@
-session_name: ntu
+session_name: drive
 shell_command_before: "source ~/.bashrc"
 windows:
   ####################################################################################################
-  # face
-  # cuda, ds, acc grad (bsz=8), lr, [folds=1,2,3,4,5]
+  # color
+  # cuda, acc grad (bsz=8), lr, [folds=1,2,3,4,5]
   ####################################################################################################
   - window_name: v
     window_shell: /bin/bash
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 1 nturgb 4 1e-3,1e-4 xview
+        ./drive_and_act.sh 0 8 1e-3,1e-4 color
   - window_name: v
     window_shell: /bin/bash
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 1 nturgb 4 1e-5,1e-6 xview
+        ./drive_and_act.sh 1 8 1e-5,1e-2 color
   - window_name: v
     window_shell: /bin/bash
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 3 nturgb 4 5e-3,5e-4 xview
-  - window_name: v
-    window_shell: /bin/bash
-    panes:
-      - >
-        sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 3 nturgb 4 5e-5,5e-6 xview
-  # - window_name: v
-  #   window_shell: /bin/bash
-  #   panes:
-  #     - >
-  #       sleep $(seq 1 30 | shuf -n 1);
-  #       ./video.sh 0 nturgb 4 1e-2,1e-3,1e-4,1e-5 xsub
+        ./drive_and_act.sh 3 8 1e-6,5e-4 color

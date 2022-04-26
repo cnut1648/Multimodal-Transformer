@@ -107,7 +107,7 @@ class ModuleMetricMixin:
         **kwargs
     ):
         assert task in ["clf", "reg"]
-        assert dataset in ["msp_improv", "cmu_mosei", "iemocap", "cmu_mosi", "ntu_rgb"]
+        assert dataset in ["msp_improv", "cmu_mosei", "iemocap", "cmu_mosi", "ntu_rgb", "drive_and_act"]
         super().__init__()
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
@@ -149,6 +149,8 @@ class ModuleMetricMixin:
                     dataset.replace("cmu_", ""), MOSEIMetric(compute_on_step=False))
             elif dataset == "ntu_rgb":
                 assert num_classes == 60
+            elif dataset == "drive_and_act":
+                assert num_classes == 34
             # iemocap
             else:
                 assert ordinal_regression is None

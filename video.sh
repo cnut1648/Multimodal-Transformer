@@ -34,10 +34,10 @@ elif [[ $ds == "mosi" ]]; then
     folds=1
 elif [[ $ds == "nturgb" ]]; then
     echo "ntu rgb";
-    bsz=4;
+    bsz=8;
     exp=ntu_rgb60_clf;
     folds=${5:xview,xsub};
-    pretrain="/shares/perception/yufeng/project/personalized_emotion_recognition/myTimesFormer/checkpoints/K600.pyth"
+    pretrain="/home/ICT2000/jxu/Multimodal-Transformer/TimeSformer/ckpt/TimeSformer_divST_8x32_224_K600.pyth"
 else
     echo "unknown ds";
     exit 0;

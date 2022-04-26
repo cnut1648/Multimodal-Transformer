@@ -1,0 +1,20 @@
+# @package _global_
+
+# to execute this experiment run:
+# python run.py exp=<name>
+
+defaults:
+  - override /datamodule: drive_and_act.yaml
+
+datamodule:
+  task: clf
+
+model:
+  # or ir, depth
+  modality: color
+
+# name of the run determines folder name in logs
+# can also be accessed by loggers
+name: DriveAct
+
+seed: 12345

@@ -1,0 +1,15 @@
+_target_: src.datamodules.drive_and_act_datamodule.DataModule
+
+task: clf
+num_classes: 34
+dataset: drive_and_act
+fold: 1
+modality: ${model.modality}
+# dataset
+data_dir: ${data_dir}/DriveAndAct
+csv_dir: ${data_dir}/DriveAndAct
+
+# dataloader
+batch_size: 32
+num_workers: 1
+pin_memory: True

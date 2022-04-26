@@ -44,6 +44,7 @@ assert value2 == blocks2[-1] + 100
 
 @hydra.main(config_path="configs/", config_name="config.yaml")
 def main(config: DictConfig):
+    # return
 
     # Imports can be nested inside @hydra.main to optimize tab completion
     # https://github.com/facebookresearch/hydra/issues/934

@@ -7,10 +7,12 @@ defaults:
   - override /model/model: timesformer
 
 datamodule:
-  num_frames: 16
-  image_size: 112
+  # num_frames: 16
+  # image_size: 112
+  num_frames: 8
+  image_size: 224
 
 model:
   model:
-    pretrained_model: /shares/perception/yufeng/project/personalized_emotion_recognition/myTimesFormer/checkpoints/Aff-Wild2.pyth
-    # pretrained_model: ''
+    # pretrained_model: /shares/perception/yufeng/project/personalized_emotion_recognition/myTimesFormer/checkpoints/Aff-Wild2.pyth
+    pretrained_model: ''

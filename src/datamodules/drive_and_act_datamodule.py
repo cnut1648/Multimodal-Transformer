@@ -14,16 +14,16 @@ from ..utils.io import sample_frames, load_img
 from torch.utils.data.dataloader import default_collate
 
 class MultiDataset(Dataset):
-    def __init__(self, task: str, csv_path, data_root, split, fold: str, **kwargs):
+    def __init__(self, task: str, csv_path, data_root, split, modality: str, **kwargs):
         self.task = task
-        self.dataset = pd.read_csv(os.path.join(csv_path, f"{fold}_post_{split}.csv"), engine="python")
+        self.dataset = pd.read_csv(os.path.join(csv_path, "processed", f"kinect_{modality}", f"{split}.csv"), engine="python")
         self.dataset.reset_index(inplace=True)
         self.data_root = data_root
         self.split = split
 
     def __getitem__(self, index):
-        # csv label 1-60, change to 0-59
-        label = self.dataset['label'][index] - 1
+        # csv label 0-33
+        label = self.dataset['label'][index]
         return {"labels": label}
 
     def __len__(self):
@@ -37,7 +37,7 @@ class MultiDataset(Dataset):
 
     def get_video(self, utterance, num_frames, transform, is_train):
         frame_dir = os.path.join(
-            self.data_root, "raw_frames", utterance)
+            self.data_root, utterance)
         frame_list = sample_frames(frame_dir, num_frames)
 
         frames = []
@@ -62,9 +62,9 @@ class MultiDataset(Dataset):
         return BatchSampler(sampler, batch_size, drop_last=False)
 
 class VideoDataset(MultiDataset):
-    def __init__(self, task: str, csv_path, data_root, fold,
+    def __init__(self, task: str, csv_path, data_root, modality,
            split, num_frames, transform=None, **kwargs):
-        super().__init__(task, csv_path, data_root, split, fold)
+        super().__init__(task, csv_path, data_root, split, modality)
         self.is_train = (split == "train")
         self.num_frames = num_frames
         self.transform = transform
@@ -88,9 +88,10 @@ class DataModule(LightningDataModule):
         batch_size: int = 64, num_workers: int = 0, pin_memory: bool = False,
         **kwargs
     ):
+        # in Drive&Act, data_dir = csv_dir which direct to folder that contains processed/
         assert os.path.exists(data_dir)
         assert os.path.exists(csv_dir)
-        assert fold in ["xview", "xsub"]
+        assert fold in [1]
         assert task in ["clf"]
         super().__init__()
 
@@ -106,16 +107,18 @@ class DataModule(LightningDataModule):
 
         self.datasets: dict = {}
         self.modality2ds = {
-            "video": VideoDataset,
+            "color": VideoDataset,
+            "ir": VideoDataset,
+            "depth": VideoDataset,
         }
 
     def setup(self, stage: Optional[str] = None):
         ds_cls = self.modality2ds[self.hparams.modality]
-        for split in ["train", "val"]:
+        for split in ["train", "val", "test"]:
             self.datasets[split] = ds_cls(
                 self.hparams.task, 
                 self.hparams.csv_dir, self.hparams.data_dir, 
-                split=split, num_frames=self.hparams.num_frames, transform=self.transforms, fold=self.hparams.fold,
+                split=split, num_frames=self.hparams.num_frames, transform=self.transforms, modality=self.hparams.modality,
             )
     
     def load_dataloader(self, split: str):
@@ -141,4 +144,4 @@ class DataModule(LightningDataModule):
         return self.load_dataloader("val")
 
     def test_dataloader(self):
-        return self.load_dataloader("val")
+        return self.load_dataloader("test")
