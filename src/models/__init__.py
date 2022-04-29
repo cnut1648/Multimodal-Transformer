@@ -7,6 +7,7 @@ from torchmetrics import (
     MeanMetric
 )
 from sklearn.metrics import accuracy_score, f1_score
+from text_module import TextModule
 
 class MOSEIMetric(Metric):
     """

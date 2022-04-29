@@ -5,32 +5,35 @@ windows:
   # audio
   # cuda, ds, acc grad (bsz=4), lr, [folds=1,2,3,4,5]
   ####################################################################################################
-  - window_name: a
-    # focus: true
-    window_shell: /bin/bash
-    panes:
-      - >
-        sleep $(seq 1 30 | shuf -n 1);
-        ./audio.sh 1 iemocap 8 1e-2 2,3,4,5
+  # - window_name: a
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./audio.sh 1 iemocap 8 1e-2 2,3,4,5
   ####################################################################################################
   # face
   # cuda, ds, acc grad (bsz=32), lr, [folds=1,2,3,4,5]
   ####################################################################################################
-  - window_name: v
-    # focus: true
-    window_shell: /bin/bash
-    panes:
-      - >
-        sleep $(seq 1 30 | shuf -n 1);
-        ./video.sh 5 iemocap 4 1e-6 1
+  # - window_name: v
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./video.sh 5 iemocap 4 1e-6 1
   ####################################################################################################
   # text
   # cuda, ds, acc grad (bsz=16), lr, [folds=1,2,3,4,5]
   ####################################################################################################
-  - window_name: t
-    # focus: true
-    window_shell: /bin/bash
-    panes:
-      - >
-        sleep $(seq 1 30 | shuf -n 1);
-        ./text.sh 2 iemocap 4 0.001 3,4,5
+  # - window_name: t
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./text.sh 2 iemocap 4 0.001 3,4,5
+  ####################################################################################################
+  # at
+  ####################################################################################################

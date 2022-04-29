@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from src.models import ModuleMetricMixin
 from src.models.components.TextModel import TextModel, PlainTransformer
 
-from PER.src.models.components.VideoModel import VideoModel
+from src.models.components.VideoModel import VideoModel
 from src.models.components.AudioModel import HuBERT
 from src.utils.modeling import weights_init, get_module_by_name, freeze, unfreeze
 

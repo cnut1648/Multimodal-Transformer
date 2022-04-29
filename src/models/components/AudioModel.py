@@ -8,27 +8,11 @@ from einops import rearrange
 from typing import List
 from transformers import AutoModelForSequenceClassification
 from transformers.models.wav2vec2.feature_extraction_wav2vec2 import Wav2Vec2FeatureExtractor
+from . import ModalityModel
 
 from transformers.models.hubert.modeling_hubert import HubertForSequenceClassification, HubertEncoderLayerStableLayerNorm
 
-
-class AudioModel(nn.Module):
-    @property
-    def hidden_size(self) -> int:
-        pass
-    @property
-    def blocks(self) -> List[nn.Module]:
-        """
-        normalization blocks
-        """
-        pass
-    def replace_linear(self, cls: nn.Module, num_out: int):
-        """
-        ordinal regression, replace last linear
-        """
-        pass
-
-class Conformer(AudioModel):
+class Conformer(ModalityModel):
     def __init__(self, num_classes, input_dim=80, encoder_dim=512, 
             num_layers: int = 17,
             num_attention_heads: int = 8,
@@ -83,7 +67,7 @@ class Conformer(AudioModel):
         return self.out(encoder_outputs)
     
 
-class HuBERT(AudioModel):
+class HuBERT(ModalityModel):
     def __init__(self, pretrain_path, num_classes, sample_rate=16_000):
         super().__init__()
         self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("superb/hubert-large-superb-er")
@@ -98,23 +82,23 @@ class HuBERT(AudioModel):
             audios, sampling_rate=self.sample_rate, return_tensors="pt",
             padding=True
         ).to(self.model.device)
-        # if not self.training:
-        logits = self.model(**inputs).logits
+        if not self.training:
+            logits = self.model(**inputs).logits
+            return logits
+        block_input, extendend_attention_mask = self.before_layers(inputs)
+        for i, block in enumerate(self.blocks):
+            dropout_probability = np.random.uniform(0, 1)
+            skip_the_layer = True if dropout_probability < self.model.config.layerdrop else False
+            if i == len(self.blocks) - 1 or i == 1:
+                skip_the_layer = False
+            # skip_the_layer = False
+            if not skip_the_layer:
+                layer_outputs = self.block(block,
+                    block_input, extendend_attention_mask)
+                # (bsz, seq_len, d)
+                block_input = layer_outputs[0]
+        logits = self.after_layers(block_input, inputs["attention_mask"])
         return logits
-        # block_input, extendend_attention_mask = self.before_layers(inputs)
-        # for i, block in enumerate(self.blocks):
-        #     dropout_probability = np.random.uniform(0, 1)
-        #     skip_the_layer = True if dropout_probability < self.model.config.layerdrop else False
-        #     if i == len(self.blocks) - 1 or i == 1:
-        #         skip_the_layer = False
-        #     # skip_the_layer = False
-        #     if not skip_the_layer:
-        #         layer_outputs = self.block(block,
-        #             block_input, extendend_attention_mask)
-        #         # (bsz, seq_len, d)
-        #         block_input = layer_outputs[0]
-        # logits = self.after_layers(block_input, inputs["attention_mask"])
-        # return logits
     
     def before_layers(self, inputs):
         input_values, attention_mask = inputs["input_values"], inputs["attention_mask"]

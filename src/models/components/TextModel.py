@@ -3,29 +3,9 @@ from torch import nn
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, PreTrainedModel
 from transformers.models.roberta.modeling_roberta import RobertaForSequenceClassification, RobertaLayer
 from ...utils.modeling import freeze
+from . import ModalityModel
 
-class TextModel(nn.Module):
-    @property
-    def hidden_size(self) -> int:
-        pass
-    @property
-    def blocks(self) -> List[nn.Module]:
-        """
-        normalization blocks
-        """
-        pass
-
-    def tokenize(self, sents: List[str]):
-        pass
-
-    def replace_linear(self, cls: nn.Module, num_out: int):
-        """
-        ordinal regression, replace last linear
-        """
-        pass
-
-
-class PlainTransformer(TextModel):
+class PlainTransformer(ModalityModel):
     def __init__(self, arch_name: str, num_classes: int, freeze_strategy: str = "no-freeze", **kwargs):
         super().__init__()
         assert freeze_strategy in ["freeze", "gradual-unfreeze", "no-freeze"]
@@ -48,17 +28,17 @@ class PlainTransformer(TextModel):
           in `bimodule` can customize this forward
           NOTE: due to dropout, forward twice can get different output
         """
-        # if not self.training:
-        output = self.model(input_ids, attention_mask=attention_mask)
-        return output.logits
-        # block_input, extendend_attention_mask = \
-        #     self.before_layers(input_ids, attention_mask)
-        # for block in self.blocks:
-        #     layer_outputs = self.block(block,
-        #         block_input, extendend_attention_mask)
-        #     block_input = layer_outputs[0]
-        # logits = self.after_layers(block_input)
-        # return logits
+        if not self.training:
+            output = self.model(input_ids, attention_mask=attention_mask)
+            return output.logits
+        block_input, extendend_attention_mask = \
+            self.before_layers(input_ids, attention_mask)
+        for block in self.blocks:
+            layer_outputs = self.block(block,
+                block_input, extendend_attention_mask)
+            block_input = layer_outputs[0]
+        logits = self.after_layers(block_input)
+        return logits
     
     def before_layers(self, input_ids, attention_mask):
         """

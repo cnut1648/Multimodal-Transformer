@@ -7,8 +7,7 @@ from omegaconf import DictConfig
 
 from src.models import ModuleMetricMixin
 
-from .components.TextModel import TextModel
-from .components.VideoModel import VideoModel
+from .components import ModalityModel
 from ..utils.modeling import weights_init
 from coral_pytorch.losses import coral_loss, corn_loss
 from coral_pytorch.layers import CoralLayer
@@ -23,7 +22,7 @@ class BaseModule(ModuleMetricMixin, LightningModule):
     ):
         super().__init__(task=task, num_classes=num_classes, dataset=dataset, ordinal_regression=ordinal_regression)
 
-        self.model: Union[TextModel, VideoModel] = hydra.utils.instantiate(
+        self.model: ModalityModel = hydra.utils.instantiate(
             model, _recursive_=False
         )
         if init:

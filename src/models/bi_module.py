@@ -8,10 +8,8 @@ from torch import nn
 from omegaconf import DictConfig
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from src.models import ModuleMetricMixin
-from src.models.components.TextModel import TextModel
 from functools import partial
 
-from PER.src.models.components.VideoModel import VideoModel
 from src.utils.modeling import weights_init, get_module_by_name, freeze, unfreeze
 
 # layer name that register hook (i.e. before norm), norm layer name
@@ -56,10 +54,12 @@ class BiModule(ModuleMetricMixin, LightningModule):
         }
         self.weight1, self.weight2 = model1.pop("weight"), model2.pop("weight")
 
-        self.model1: TextModel = hydra.utils.instantiate(
+        x = ModalityModel.load_ckpt()
+
+        self.model1: ModalityModel = hydra.utils.instantiate(
             model1.model
         )
-        self.model2: VideoModel = hydra.utils.instantiate(
+        self.model2: ModalityModel = hydra.utils.instantiate(
             model2.model, _recursive_=False
         )
         if init:

@@ -64,15 +64,15 @@ for sessionid in [1, 2, 3, 4, 5]:
         """
         no video
         """
-        frame_dir = os.path.join(
-            data_root, "video", 'Session'+session, utterance) 
-        if not os.path.exists(frame_dir):
-            bad_indexs.append(index)
-            continue
-        if len(os.listdir(frame_dir)) < 16:
-            frame_lost += 1
-            bad_indexs.append(index)
-            continue
+        # frame_dir = os.path.join(
+        #     data_root, "video", 'Session'+session, utterance) 
+        # if not os.path.exists(frame_dir):
+        #     bad_indexs.append(index)
+        #     continue
+        # if len(os.listdir(frame_dir)) < 16:
+        #     frame_lost += 1
+        #     bad_indexs.append(index)
+        #     continue
         
         """
         audio fbank
