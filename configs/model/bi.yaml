@@ -5,12 +5,16 @@ model1:
   optim: ???
   scheduler: ???
   weight: 1.0
+  # if set, get best ckpt from wandb
+  # <project>:<id>
+  wandb_path: null
 
 model2:
   model: ???
   optim: ???
   scheduler: null
   weight: 1.0
+  wandb_path: null
 
 aligner_optim: ???
 link_mode: ???

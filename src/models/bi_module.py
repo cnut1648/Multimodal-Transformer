@@ -9,6 +9,7 @@ from omegaconf import DictConfig
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from src.models import ModuleMetricMixin
 from functools import partial
+from src.models.components import ModalityModel
 
 from src.utils.modeling import weights_init, get_module_by_name, freeze, unfreeze
 
@@ -54,14 +55,21 @@ class BiModule(ModuleMetricMixin, LightningModule):
         }
         self.weight1, self.weight2 = model1.pop("weight"), model2.pop("weight")
 
-        x = ModalityModel.load_ckpt()
-
-        self.model1: ModalityModel = hydra.utils.instantiate(
-            model1.model
-        )
-        self.model2: ModalityModel = hydra.utils.instantiate(
-            model2.model, _recursive_=False
-        )
+        path1, path2 = model1.pop("wandb_path"), model2.pop("wandb_path")
+        if path1 is None:
+            self.model1: ModalityModel = hydra.utils.instantiate(
+                model1.model
+            )
+        else:
+            self.model1: ModalityModel = ModalityModel.load_ckpt(path1)
+        if path2 is None:
+            self.model2: ModalityModel = hydra.utils.instantiate(
+                model2.model, _recursive_=False
+            )
+        else:
+            self.model2: ModalityModel = ModalityModel.load_ckpt(path2)
+            
+            
         if init:
             self.apply(weights_init(init))
         
@@ -231,7 +239,8 @@ class BiModule(ModuleMetricMixin, LightningModule):
         # ]
         # logits := (logits1, logits2, combine logits)
         logits, statistics_storages = self.forward_with_stat(batch)
-        if split == "train":
+        # if no_exchange at all, don't forward twice
+        if len(self.hparams.exchange_levels) > 0 and split == "train":
             # forward twice, 1st time (already did) get stat and exchange; 2nd time forward with new stat from this batch
             # (N, K)
             logits, _ = self.forward_with_stat(batch, statistics_storages)

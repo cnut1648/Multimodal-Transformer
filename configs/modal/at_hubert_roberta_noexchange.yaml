@@ -1,0 +1,44 @@
+# @package _global_
+
+defaults:
+  - /model/model/hubert@model.model1.model
+  - /model/optim/adam@model.model1.optim
+
+  - /model/model/roberta@model.model2.model
+  - /model/optim/adamw@model.model2.optim
+  - model.model2.scheduler: null
+  - /model/optim/adam@model.aligner_optim
+  - override /model: bi
+
+model:
+  link_mode: sync
+  modality: at
+  model1:
+    scheduler: null
+  unfreeze_epoch: 0
+  exchange_levels: []
+    # # 1 <-> 2
+    # - 
+    # only 1->2
+    # - [1, [temporal_fc, output.dense], [norm2, output.LayerNorm], [True, False]]
+    # - [-1, [temporal_fc, output.dense], [norm2, output.LayerNorm], [True, False]]
+    # only 1->2, layernorm
+    # - [1, [norm2, output.LayerNorm], [norm2, output.LayerNorm], [True, False]]
+    # - [-1, [norm2, output.LayerNorm], [norm2, output.LayerNorm], [True, False]]
+
+datamodule:
+  spec_aug: True
+  # max_audio_len: 500000
+  # max_audio_len: 300000
+  max_audio_len: 200000
+  audio_format: raw
+  cache_dir: ${data_dir}/cache/raw
+  use_smart_sampler: False
+
+trainer:
+  gradient_clip_val: null
+  accumulate_grad_batches: null
+
+callbacks:
+  early_stopping:
+    patience: 20

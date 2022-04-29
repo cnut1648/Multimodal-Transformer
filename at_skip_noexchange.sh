@@ -52,7 +52,8 @@ for fold in ${folds//,/ }; do
     echo "FOLD $fold, use ckpt1=$ckpt1 & ckpt2=$ckpt2"
     echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++";
     CUDA_VISIBLE_DEVICES=$cuda /home/ICT2000/jxu/miniconda3/envs/conv/bin/python run.py -m \
-        exp=$exp modal=at_hubert_roberta \
+        model._target_='src.models.bi_module_linear_stat.BiModule' \
+        exp=$exp modal=at_hubert_roberta_noexchange \
         callbacks.early_stopping.patience=20 \
         model.unfreeze_epoch=5 \
         datamodule.batch_size=$bsz \

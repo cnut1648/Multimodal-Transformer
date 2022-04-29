@@ -36,4 +36,40 @@ windows:
   #       ./text.sh 2 iemocap 4 0.001 3,4,5
   ####################################################################################################
   # at
+  # cuda, ds, acc grad (bsz=4), lr1, lr2, lr_align, [folds=1,2,3,4,5]
   ####################################################################################################
+  # - window_name: at
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./at.sh 2 iemocap 4 0.01 0.001 0.005 1
+  # - window_name: at
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./at.sh 0 iemocap 4 0.01 0.001 0.001 1
+  # - window_name: at
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./at_skip.sh 1 iemocap 4 0.01 0.001 0.005 1
+  # - window_name: at
+  #   # focus: true
+  #   window_shell: /bin/bash
+  #   panes:
+  #     - >
+  #       sleep $(seq 1 30 | shuf -n 1);
+  #       ./at_skip.sh 3 iemocap 4 0.01 0.001 0.001 1
+  - window_name: at
+    # focus: true
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./at_skip_noexchange.sh 0 iemocap 4 0.01 0.001 0.005 1
