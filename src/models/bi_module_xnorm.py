@@ -1,5 +1,6 @@
-from typing import Any, List, Optional, Dict, Tuple
+from typing import Any, List, Optional
 import math
+import numpy as np
 from pytorch_lightning import LightningModule
 from pytorch_lightning.core.optimizer import LightningOptimizer
 
@@ -8,18 +9,18 @@ from torch import nn
 from omegaconf import DictConfig
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from src.models import ModuleMetricMixin
-from functools import partial
-from src.models.components import ModalityModel
+from src.models.components.TextModel import TextModel, PlainTransformer
 
+from src.models.components.VideoModel import VideoModel
+from src.models.components.AudioModel import HuBERT
 from src.utils.modeling import weights_init, get_module_by_name, freeze, unfreeze
 
-# layer name that register hook (i.e. before norm), norm layer name
-Before_And_Norm = Tuple[str, str]
-# if 0th is True, exchange 1->2, otherwise disable
-# if 1th is True, exchange 2->1, otherwise disable
-IS_EXCHANGE_ENABLE = Tuple[bool, bool]
-# block level, and Before_And_Norm for model 1 and 2
-BlockStatId = Tuple[int, Before_And_Norm, Before_And_Norm, IS_EXCHANGE_ENABLE]
+class Aligner(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.linear = nn.Linear(input_dim, output_dim)
+    def forward(self, x):
+        return self.linear(x)
 
 class BiModule(ModuleMetricMixin, LightningModule):
     """
@@ -34,7 +35,7 @@ class BiModule(ModuleMetricMixin, LightningModule):
     """
     def __init__(
         self, task: str, num_classes: int, dataset: str, modality: str, 
-        exchange_levels: List[BlockStatId], link_mode: str, 
+        exchange_levels: List[list], link_mode: str, 
         aligner_optim: DictConfig, model1: DictConfig, model2: DictConfig, 
         accumulate_grad_batches: int = 1, unfreeze_epoch: int = 10,
         init: Optional[str] = None, ordinal_regression: Optional[str] = None,
@@ -55,21 +56,12 @@ class BiModule(ModuleMetricMixin, LightningModule):
         }
         self.weight1, self.weight2 = model1.pop("weight"), model2.pop("weight")
 
-        path1, path2 = model1.pop("wandb_path"), model2.pop("wandb_path")
-        if path1 is None:
-            self.model1: ModalityModel = hydra.utils.instantiate(
-                model1.model
-            )
-        else:
-            self.model1: ModalityModel = ModalityModel.load_ckpt(path1)
-        if path2 is None:
-            self.model2: ModalityModel = hydra.utils.instantiate(
-                model2.model, _recursive_=False
-            )
-        else:
-            self.model2: ModalityModel = ModalityModel.load_ckpt(path2)
-            
-            
+        self.model1: TextModel = hydra.utils.instantiate(
+            model1.model
+        )
+        self.model2: VideoModel = hydra.utils.instantiate(
+            model2.model, _recursive_=False
+        )
         if init:
             self.apply(weights_init(init))
         
@@ -82,12 +74,12 @@ class BiModule(ModuleMetricMixin, LightningModule):
             self.criterion = torch.nn.MSELoss()
 
         self.aligner1 = nn.ModuleDict({
-            f"{idx}th_aligner": nn.Linear(self.model1.hidden_size, self.model2.hidden_size)
-            for idx in range(len(exchange_levels))
+            f"{idx}": Aligner(self.model1.hidden_size, self.model2.hidden_size)
+            for idx, t1, _ in exchange_levels if t1
         })
         self.aligner2 = nn.ModuleDict({
-            f"{idx}th_aligner": nn.Linear(self.model2.hidden_size, self.model1.hidden_size)
-            for idx in range(len(exchange_levels))
+            f"{idx}": Aligner(self.model2.hidden_size, self.model1.hidden_size)
+            for idx, _, t2 in exchange_levels if t2
         })
 
         # append valid and test metric for two submodules
@@ -142,131 +134,92 @@ class BiModule(ModuleMetricMixin, LightningModule):
         return loss, preds
     
     def forward(self, batch: dict):
-        logits1 = self.model1(**batch)
-        logits2 = self.model2(**batch)
+        audios, input_ids, attention_mask = batch["audios"], batch["input_ids"], batch["attention_mask"]
+        self.model1: HuBERT
+        self.model2: PlainTransformer
+        inputs = self.model1.feature_extractor(
+            audios, sampling_rate=self.model1.sample_rate, return_tensors="pt",
+            padding=True).to(self.device)
+        block_input1, extendend_attention_mask1 = self.model1.before_layers(inputs)
+        block_input2, extendend_attention_mask2 = \
+            self.model2.before_layers(input_ids, attention_mask)
+        (
+            skip_exchange_input1, skip_exchange_input2,
+            ready_to_exchange1, ready_to_exchange2,
+            blocks1, blocks2,
+            i1, i2) = (
+                None, None,
+                False, False,
+                self.model1.blocks, self.model2.blocks,
+                0, 0
+        )
+        # loop until both get to the last block
+        while i1 < len(blocks1) or i2 < len(blocks2):
+            for exchange_block_id, t1, t2 in self.hparams.exchange_levels:
+                # exchange when
+                #  - enabled (t1 / t2)
+                #  - training mode
+                #  - index within bound
+                #  - index match with corresponding exchange_level
+                if t1 and self.training and i1 < len(blocks1) and blocks1[i1] is blocks1[exchange_block_id]:
+                    # i.e. from 2 to 1
+                    # (bsz, L2, d) -> (bsz, 1, d)
+                    skip_exchange_input1 = self.aligner2[str(exchange_block_id)](block_input2)
+                    skip_exchange_input1 = skip_exchange_input1.mean(1, keepdim=True)
+                    ready_to_exchange1 = True
+                if t2 and self.training and i2 < len(blocks2) and blocks2[i2] is blocks2[exchange_block_id]:
+                    # i.e. from 1 to 2
+                    # (bsz, L1, d) -> (bsz, 1, d)
+                    skip_exchange_input2 = self.aligner1[str(exchange_block_id)](block_input1)
+                    skip_exchange_input2 = skip_exchange_input2.mean(1, keepdim=True)
+                    ready_to_exchange2 = True
+            # if ready to exchange but not exchange, wait until the other is ready
+            # can't go above the last one
+            if i1 < len(blocks1) and not ready_to_exchange1:
+                dropout_probability = np.random.uniform(0, 1)
+                skip_the_layer = True if (
+                    self.training and dropout_probability < self.model1.model.config.layerdrop) else False
+                if not skip_the_layer:
+                    layer_outputs = self.model1.block(blocks1[i1],
+                        block_input1, extendend_attention_mask1, skip_input=None)
+                    block_input1 = layer_outputs[0]
+                i1 += 1
+            if i2 < len(blocks2) and not ready_to_exchange2:
+                layer_outputs = self.model2.block(blocks2[i2],
+                    block_input2, extendend_attention_mask2, skip_input=None)
+                block_input2 = layer_outputs[0]
+                i2 += 1
+            if skip_exchange_input1 is not None and skip_exchange_input2 is not None:
+                # if exchange, do not skip layer
+                layer_outputs = self.model1.block(blocks1[i1],
+                    block_input1, extendend_attention_mask1, skip_input=skip_exchange_input1)
+                block_input1 = layer_outputs[0]
+                layer_outputs = self.model2.block(blocks2[i2],
+                    block_input2, extendend_attention_mask2, skip_input=skip_exchange_input2)
+                block_input2 = layer_outputs[0]
+
+                skip_exchange_input1 = skip_exchange_input2 = None
+                ready_to_exchange1 = ready_to_exchange2 = False
+                i1 += 1
+                i2 += 1
+            
+        logits1 = self.model1.after_layers(block_input1, inputs["attention_mask"])
+        logits2 = self.model2.after_layers(block_input2)
         return logits1, logits2, 0.5 * logits1 + 0.5 * logits2
-
-    def forward_with_stat(self, batch: dict, statistics_storages=None):
-        """
-        same as forward but compute stat for `exchange_levels`
-        return 
-        statistics_storages: [model1's output (in model2 space), model2's output (in model1 space)]
-        """
-        if statistics_storages is not None:
-            is_second_time = True
-        else:
-            is_second_time = False
-            statistics_storage1, statistics_storage2 = [], []
-            statistics_storages = (statistics_storage1, statistics_storage2)
-
-        def ComputeStatHook(module, input, output, aligner):
-            """
-            pytorch hook, module(input) = output
-            called in the order from 0th layer to last
-            use Linear to compute statistics
-            """
-            if aligner is self.aligner1:
-                storage = statistics_storage1
-            else:
-                storage = statistics_storage2
-            ith = len(storage)
-            # (B, seq_len, hidden)
-            hidden = input[0]
-            # (B, seq_len, hidden)
-            representation = aligner[f'{ith}th_aligner'](hidden)
-            μ = representation.mean([0, 1])
-            σ = representation.var([0, 1]).sqrt()
-            storage.append([μ, σ])
-        
-        def ApplyStatHook(module, input, output, stats):
-            """
-            stats: mean & std from opposite model
-            """
-            μ, σ = stats
-            input = input[0]
-            normalized_input = (input - input.mean(-1, keepdim=True)) / input.std(-1, keepdim=True).add(module.eps)
-            return normalized_input * σ + μ
-
-        hook_handles = []
-        if is_second_time:
-            for idx, _, layers_to_apply, is_exchange_enables in self.hparams.exchange_levels:
-                # normlayer: [model1 norm, model2 norm]
-                # statistics_storages: [model1's output (in model2 space), model2's output (in model1 space)]
-                for layername, mean_std_list, opposite_model, is_exchange_enable in zip(
-                    layers_to_apply[::-1], statistics_storages, 
-                    [self.model2, self.model1], is_exchange_enables):
-                    if is_exchange_enable:
-                        mean, std = mean_std_list[idx]
-                        m1, m2 = self.modality
-                        if opposite_model is self.model2:
-                            direction = f"{m1}->{m2}"
-                        else:
-                            direction = f"{m2}->{m1}"
-                        self.log(f"stat/{direction}/ℒ[{idx}]mean", mean.mean(), sync_dist=True, prog_bar=False, on_epoch=False, on_step=True)
-                        self.log(f"stat/{direction}/ℒ[{idx}]std", std.mean(), sync_dist=True, prog_bar=False, on_epoch=False, on_step=True)
-                        block = opposite_model.blocks[idx]
-                        block = get_module_by_name(block, layername)
-                        hook_handles.append(block.register_forward_hook(
-                            partial(ApplyStatHook, stats=mean_std_list[idx])
-                        ))
-        else:
-            for idx, layernorms, _, is_exchange_enables in self.hparams.exchange_levels:
-                for layername, aligner_for_hook, model, is_exchange_enable in zip(
-                    layernorms, [self.aligner1, self.aligner2], [self.model1, self.model2],
-                    is_exchange_enables
-                ):
-                    if is_exchange_enable:
-                        block = model.blocks[idx]
-                        # before norm
-                        block = get_module_by_name(block, layername)
-                        hook_handles.append(block.register_forward_hook(
-                            partial(ComputeStatHook, aligner=aligner_for_hook)
-                        ))
-        logits = self(batch)
-
-        # remove hooks to avoid unnecessary mess
-        for hook in hook_handles:
-            hook.remove()
-
-        return logits, statistics_storages    
 
     def compute_step(self, batch: dict, split: str):
         batch, labels = self.preprocess_batch(batch)
-        # import numpy as np
-        # batch["audios"] = [
-        #     np.random.random(size=(230000, )).astype(batch["audios"][i].dtype)
-        #     for i in range(4)
-        # ]
         # logits := (logits1, logits2, combine logits)
-        logits, statistics_storages = self.forward_with_stat(batch)
-        # if no_exchange at all, don't forward twice
-        if len(self.hparams.exchange_levels) > 0 and split == "train":
-            # forward twice, 1st time (already did) get stat and exchange; 2nd time forward with new stat from this batch
-            # (N, K)
-            logits, _ = self.forward_with_stat(batch, statistics_storages)
+        logits = self(batch)
         ret = {"targets": labels}
         losses = []
-        # find instances where single modal is wrong but mulit modal is correct
-        with torch.no_grad():
-            case_study_label = labels.detach().cpu().numpy()
-            case_study_pred = list(zip(*[
-                self.postprocess_batch(model_logit, labels)[1].detach().cpu().numpy()
-                for model_logit in logits
-            ]))
-            for p, l, u in zip(case_study_pred, case_study_label, batch["utterance"]):
-                p1, p2, p = p
-                if (l != p1) and (l != p2) and (p == l):
-                    print(u)
-        
         for model_logit, suffix in zip(logits, ["1", "2", ""]):
-            # metricname = f"{split}_metrics{suffix}"
             loss, preds = self.postprocess_batch(model_logit, labels)
             if suffix == "":
                 # return combined
                 loss = sum([l * w for l, w in zip(losses, [self.weight1, self.weight2])])
-            # log train metrics
-            # self.metrics[metricname](preds, labels)
-            self.log(f"{split}/step/loss{suffix}", loss, on_step=True, on_epoch=False, prog_bar=False, sync_dist=True)
+            self.log(f"{split}/step/loss{suffix}", loss, on_step=True, on_epoch=False, 
+                                prog_bar=False, sync_dist=True)
             ret.update({
                 f"loss{suffix}": loss,
                 f"preds{suffix}": preds,
@@ -296,7 +249,7 @@ class BiModule(ModuleMetricMixin, LightningModule):
         if split != "test":
             for suffix in ["1", "2", ""]:
                 loss = self.mean_losses[f"{split}_losses{suffix}"].compute()
-                self.log(f"{split}/epoch/loss{suffix}", loss, on_epoch=True, prog_bar=True)
+                self.log(f"{split}/epoch/loss{suffix}", loss, on_epoch=True, prog_bar=(suffix==""))
                 self.mean_losses[f"{split}_losses{suffix}"].reset()
         for suffix in ["1", "2", ""]:
             metrics = self.metrics[f"{split}_metrics{suffix}"].compute()
@@ -366,10 +319,9 @@ class BiModule(ModuleMetricMixin, LightningModule):
         # initially freeze
         freeze(self.model1)
         freeze(self.model2)
-        unfreeze(self.model1.blocks[1])
-        unfreeze(self.model1.blocks[-1])
-        unfreeze(self.model2.blocks[1])
-        unfreeze(self.model2.blocks[-1])
+        for idx, _, _ in self.hparams.exchange_levels:
+            unfreeze(self.model1.blocks[idx])
+            unfreeze(self.model2.blocks[idx])
 
         optimizers, schedulers = [], []
         for i, (modality, model) in enumerate(zip(self.modality, [self.model1, self.model2]), 1):

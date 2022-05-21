@@ -21,6 +21,21 @@ IS_EXCHANGE_ENABLE = Tuple[bool, bool]
 # block level, and Before_And_Norm for model 1 and 2
 BlockStatId = Tuple[int, Before_And_Norm, Before_And_Norm, IS_EXCHANGE_ENABLE]
 
+class MLP(nn.Module):
+    def __init__(self, hidden_size, classifier_dropout, num_labels):
+        super().__init__()
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.out_proj = nn.Linear(hidden_size, num_labels)
+    def forward(self, x):
+        # x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
+        x = self.dropout(x)
+        x = self.dense(x)
+        x = torch.tanh(x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x 
+
 class BiModule(ModuleMetricMixin, LightningModule):
     """
     use two modalities
@@ -68,7 +83,8 @@ class BiModule(ModuleMetricMixin, LightningModule):
             )
         else:
             self.model2: ModalityModel = ModalityModel.load_ckpt(path2)
-            
+        
+        self.mlp = MLP(1024 + 256, 0.3, num_classes)
             
         if init:
             self.apply(weights_init(init))
@@ -82,11 +98,11 @@ class BiModule(ModuleMetricMixin, LightningModule):
             self.criterion = torch.nn.MSELoss()
 
         self.aligner1 = nn.ModuleDict({
-            f"{idx}th_aligner": nn.Linear(self.model1.hidden_size, self.model2.hidden_size)
+            f"{idx}th_aligner": nn.Linear(self.model1.hidden_size, self.model2.hidden_size * 2)
             for idx in range(len(exchange_levels))
         })
         self.aligner2 = nn.ModuleDict({
-            f"{idx}th_aligner": nn.Linear(self.model2.hidden_size, self.model1.hidden_size)
+            f"{idx}th_aligner": nn.Linear(self.model2.hidden_size, self.model1.hidden_size * 2)
             for idx in range(len(exchange_levels))
         })
 
@@ -142,9 +158,11 @@ class BiModule(ModuleMetricMixin, LightningModule):
         return loss, preds
     
     def forward(self, batch: dict):
-        logits1 = self.model1(**batch)
-        logits2 = self.model2(**batch)
-        return logits1, logits2, 0.5 * logits1 + 0.5 * logits2
+        logits1 = self.model1(**batch, feature_extract=True)
+        logits2 = self.model2(**batch, feature_extract=True)
+        logits = torch.cat([logits1, logits2], dim=1)
+        logits = self.mlp(logits)
+        return logits
 
     def forward_with_stat(self, batch: dict, statistics_storages=None):
         """
@@ -172,10 +190,10 @@ class BiModule(ModuleMetricMixin, LightningModule):
             ith = len(storage)
             # (B, seq_len, hidden)
             hidden = input[0]
-            # (B, seq_len, hidden)
-            representation = aligner[f'{ith}th_aligner'](hidden)
-            μ = representation.mean([0, 1])
-            σ = representation.var([0, 1]).sqrt()
+            # (B, seq_len, 2 * hidden) -> (2*hidden, )
+            stat = aligner[f'{ith}th_aligner'](hidden).mean([0, 1])
+            μ, lnσ2 = torch.chunk(stat, 2)
+            σ = lnσ2.exp().sqrt()
             storage.append([μ, σ])
         
         def ApplyStatHook(module, input, output, stats):
@@ -246,24 +264,12 @@ class BiModule(ModuleMetricMixin, LightningModule):
             logits, _ = self.forward_with_stat(batch, statistics_storages)
         ret = {"targets": labels}
         losses = []
-        # find instances where single modal is wrong but mulit modal is correct
-        with torch.no_grad():
-            case_study_label = labels.detach().cpu().numpy()
-            case_study_pred = list(zip(*[
-                self.postprocess_batch(model_logit, labels)[1].detach().cpu().numpy()
-                for model_logit in logits
-            ]))
-            for p, l, u in zip(case_study_pred, case_study_label, batch["utterance"]):
-                p1, p2, p = p
-                if (l != p1) and (l != p2) and (p == l):
-                    print(u)
-        
-        for model_logit, suffix in zip(logits, ["1", "2", ""]):
+        for model_logit, suffix in zip([logits], [""]):
             # metricname = f"{split}_metrics{suffix}"
             loss, preds = self.postprocess_batch(model_logit, labels)
-            if suffix == "":
-                # return combined
-                loss = sum([l * w for l, w in zip(losses, [self.weight1, self.weight2])])
+            # if suffix == "":
+            #     # return combined
+            #     loss = sum([l * w for l, w in zip(losses, [self.weight1, self.weight2])])
             # log train metrics
             # self.metrics[metricname](preds, labels)
             self.log(f"{split}/step/loss{suffix}", loss, on_step=True, on_epoch=False, prog_bar=False, sync_dist=True)
@@ -279,26 +285,19 @@ class BiModule(ModuleMetricMixin, LightningModule):
         log, since DDP logging must be put in *_step_end method
         """
         (loss, preds,
-         loss1, preds1,
-         loss2, preds2, labels) = (outputs["loss"], outputs["preds"], 
-                                  outputs["loss1"], outputs["preds1"], 
-                                  outputs["loss2"], outputs["preds2"], outputs["targets"])
+         labels) = (outputs["loss"], outputs["preds"], outputs["targets"])
         # log metrics
         if split != "test":
             self.mean_losses[f"{split}_losses"](loss)
-            self.mean_losses[f"{split}_losses1"](loss1)
-            self.mean_losses[f"{split}_losses2"](loss2)
         self.metrics[f"{split}_metrics"](preds, labels)
-        self.metrics[f"{split}_metrics1"](preds1, labels)
-        self.metrics[f"{split}_metrics2"](preds2, labels)
 
     def agg_epoch(self, outputs: List[Any], split: str):
         if split != "test":
-            for suffix in ["1", "2", ""]:
+            for suffix in [""]:
                 loss = self.mean_losses[f"{split}_losses{suffix}"].compute()
                 self.log(f"{split}/epoch/loss{suffix}", loss, on_epoch=True, prog_bar=True)
                 self.mean_losses[f"{split}_losses{suffix}"].reset()
-        for suffix in ["1", "2", ""]:
+        for suffix in [""]:
             metrics = self.metrics[f"{split}_metrics{suffix}"].compute()
             # make classwise e.g. valid/1/accuracy_neu separate namespace
             for k in list(metrics):
@@ -370,6 +369,7 @@ class BiModule(ModuleMetricMixin, LightningModule):
         unfreeze(self.model1.blocks[-1])
         unfreeze(self.model2.blocks[1])
         unfreeze(self.model2.blocks[-1])
+        unfreeze(self.mlp)
 
         optimizers, schedulers = [], []
         for i, (modality, model) in enumerate(zip(self.modality, [self.model1, self.model2]), 1):
@@ -444,6 +444,7 @@ class BiModule(ModuleMetricMixin, LightningModule):
         params = [
             {"params": self.aligner1.parameters(), "weight_decay": wd},
             {"params": self.aligner2.parameters(), "weight_decay": wd},
+            {"params": self.mlp.parameters(), "weight_decay": wd},
         ]
         optimizers.append( hydra.utils.instantiate(
             self.hparams.aligner_optim, params=params,

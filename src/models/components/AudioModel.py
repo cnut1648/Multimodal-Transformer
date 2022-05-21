@@ -74,7 +74,7 @@ class HuBERT(ModalityModel):
         self.model = HubertForSequenceClassification.from_pretrained(pretrain_path, num_labels=num_classes)
         self.sample_rate = sample_rate
     
-    def forward(self, audios, **kwargs):
+    def forward(self, audios, feature_extract=False, **kwargs):
         """
         audios: must be raw wave
         """
@@ -82,9 +82,9 @@ class HuBERT(ModalityModel):
             audios, sampling_rate=self.sample_rate, return_tensors="pt",
             padding=True
         ).to(self.model.device)
-        if not self.training:
-            logits = self.model(**inputs).logits
-            return logits
+        # if not self.training:
+        #     logits = self.model(**inputs).logits
+        #     return logits
         block_input, extendend_attention_mask = self.before_layers(inputs)
         for i, block in enumerate(self.blocks):
             dropout_probability = np.random.uniform(0, 1)
@@ -97,7 +97,7 @@ class HuBERT(ModalityModel):
                     block_input, extendend_attention_mask)
                 # (bsz, seq_len, d)
                 block_input = layer_outputs[0]
-        logits = self.after_layers(block_input, inputs["attention_mask"])
+        logits = self.after_layers(block_input, inputs["attention_mask"], feature_extract)
         return logits
     
     def before_layers(self, inputs):
@@ -141,7 +141,7 @@ class HuBERT(ModalityModel):
         outputs = (hidden_states,)
         return outputs
 
-    def after_layers(self, encoder_outputs, attention_mask):
+    def after_layers(self, encoder_outputs, attention_mask, feature_extract=False):
         encoder_outputs = self.model.hubert.encoder.layer_norm(encoder_outputs)
         # (bsz, seq_len, d1 -> d2)
         hidden_states = self.model.projector(encoder_outputs)
@@ -151,6 +151,8 @@ class HuBERT(ModalityModel):
         hidden_states[~padding_mask] = 0.0
         # (bsz, d2)
         pooled_output = hidden_states.sum(dim=1) / padding_mask.sum(dim=1).view(-1, 1)
+        if feature_extract:
+            return pooled_output
 
         logits = self.model.classifier(pooled_output)
         return logits

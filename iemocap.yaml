@@ -72,4 +72,18 @@ windows:
     panes:
       - >
         sleep $(seq 1 30 | shuf -n 1);
-        ./at_skip_noexchange.sh 0 iemocap 4 0.01 0.001 0.005 1
+        ./at_mlp.sh 5 iemocap 4 0.01 0.001 0.005 1
+  - window_name: at
+    # focus: true
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./at_mlp.sh 6 iemocap 4 0.01 0.001 0.001 1
+  - window_name: at
+    # focus: true
+    window_shell: /bin/bash
+    panes:
+      - >
+        sleep $(seq 1 30 | shuf -n 1);
+        ./at_mlp.sh 7 iemocap 4 0.01 0.001 0.01 1

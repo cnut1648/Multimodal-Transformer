@@ -25,12 +25,12 @@ data_root = pwd / "../data/data/IEMOCAP"
 audio_lens = []
 
 # can compute stat here
-# csv_path = csv_dir / f"Session{1}.csv"
-# dataset = pd.read_csv(csv_path)
-# for sessionid in [2, 3, 4, 5]:
-#     csv_path = csv_dir / f"Session{sessionid}.csv"
-#     dataset = dataset.append( pd.read_csv(csv_path))
-# dataset.reset_index(inplace=True)
+csv_path = csv_dir / f"Session{1}.csv"
+dataset = pd.read_csv(csv_path)
+for sessionid in [2, 3, 4, 5]:
+    csv_path = csv_dir / f"Session{sessionid}.csv"
+    dataset = dataset.append( pd.read_csv(csv_path))
+dataset.reset_index(inplace=True)
 
 frame_lost = 0
 for sessionid in [1, 2, 3, 4, 5]:

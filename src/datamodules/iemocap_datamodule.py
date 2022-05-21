@@ -49,7 +49,7 @@ class MultiDataset(Dataset):
         session, gender, dialog, utteranceid = get_meta(utterance)
         ret = {
             # e.g. 2F
-            "speaker": f"{session}{gender}",
+            "speaker": f"{session}{gender}", "utterance": utterance
         }
         if self.task == 'reg':
             valence = np.float32(self.dataset['valence'][index])
